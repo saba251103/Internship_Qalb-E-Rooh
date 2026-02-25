@@ -1,3 +1,4 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons'; // Added Icon Import
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -5,8 +6,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
-  Dimensions,
   FlatList,
+  PixelRatio,
   Platform,
   SafeAreaView,
   StatusBar,
@@ -16,7 +17,16 @@ import {
   View
 } from 'react-native';
 
-const { width } = Dimensions.get('window');
+// Library 1: react-native-responsive-screen
+import { widthPercentageToDP as wp } from 'react-native-responsive-screen';
+
+// Library 2: react-native-size-matters
+import { moderateScale, scale, verticalScale } from 'react-native-size-matters';
+
+// --- FONT SCALING HELPER ---
+const fontScale = (size: number) => {
+  return Platform.OS === 'android' ? moderateScale(size, 0.3) : moderateScale(size);
+};
 
 export default function QuranListScreen() {
   const router = useRouter();
@@ -26,6 +36,8 @@ export default function QuranListScreen() {
   const [loading, setLoading] = useState(true);
   const [recent, setRecent] = useState<any>(null);
   const [slideAnim] = useState(new Animated.Value(0));
+
+  const hairline = 1 / PixelRatio.get();
 
   useEffect(() => {
     fetch('https://api.alquran.cloud/v1/surah')
@@ -44,6 +56,9 @@ export default function QuranListScreen() {
     }, [])
   );
 
+  const TAB_CONTAINER_WIDTH = wp('90%'); 
+  const TAB_WIDTH = (TAB_CONTAINER_WIDTH - scale(8)) / 2;
+
   useEffect(() => {
     Animated.spring(slideAnim, {
       toValue: activeTab === 'surah' ? 0 : 1,
@@ -52,6 +67,11 @@ export default function QuranListScreen() {
       friction: 10,
     }).start();
   }, [activeTab]);
+
+  const handleBackPress = () => {
+    //<Press onPress={() => router.back()} style={s.navBtn}>
+    router.back(); // Navigate back to Quran Screen
+  };
 
   const handleSurahPress = (number: number, name: string) => {
     const recentData = { number, name, time: new Date().toLocaleDateString() };
@@ -69,7 +89,7 @@ export default function QuranListScreen() {
     } as any);
   };
 
-  const renderSurah = ({ item, index }: any) => {
+  const renderSurah = ({ item }: any) => {
     const isMakki = item.revelationType === 'Meccan';
     
     return (
@@ -82,19 +102,16 @@ export default function QuranListScreen() {
           colors={['rgba(245, 245, 220, 0.12)', 'rgba(245, 245, 220, 0.05)']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.cardGradient}
+          style={[styles.cardGradient, { borderWidth: hairline * 2 }]}
         >
-          {/* Decorative Corner Accent */}
           <View style={styles.cornerAccent} />
           
-          {/* Number Badge */}
           <View style={styles.badgeContainer}>
             <View style={styles.badge}>
               <Text style={styles.badgeText}>{item.number}</Text>
             </View>
           </View>
 
-          {/* Middle Section */}
           <View style={styles.middleSection}>
             <Text style={styles.cardTitle}>{item.englishName}</Text>
             <Text style={styles.cardTranslation}>{item.englishNameTranslation}</Text>
@@ -108,7 +125,6 @@ export default function QuranListScreen() {
             </View>
           </View>
 
-          {/* Arabic Name */}
           <View style={styles.rightSection}>
             <Text style={styles.arabicName}>{item.name}</Text>
             <View style={styles.chevronCircle}>
@@ -120,7 +136,7 @@ export default function QuranListScreen() {
     );
   };
 
-  const renderPara = ({ item, index }: any) => (
+  const renderPara = ({ item }: any) => (
     <TouchableOpacity 
       style={styles.card} 
       onPress={() => handleParaPress(item)}
@@ -130,24 +146,21 @@ export default function QuranListScreen() {
         colors={['rgba(245, 245, 220, 0.12)', 'rgba(245, 245, 220, 0.05)']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={styles.cardGradient}
+        style={[styles.cardGradient, { borderWidth: hairline * 2 }]}
       >
         <View style={styles.cornerAccent} />
         
-        {/* Number Badge */}
         <View style={styles.badgeContainer}>
           <View style={styles.badge}>
             <Text style={styles.badgeText}>{item}</Text>
           </View>
         </View>
 
-        {/* Middle Section */}
         <View style={[styles.middleSection, { flex: 1 }]}>
           <Text style={styles.cardTitle}>Para {item}</Text>
           <Text style={styles.cardTranslation}>Juz' al-Qur'an {item}</Text>
         </View>
 
-        {/* Chevron */}
         <View style={styles.chevronCircle}>
           <Text style={styles.chevron}>›</Text>
         </View>
@@ -158,7 +171,7 @@ export default function QuranListScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <StatusBar barStyle="light-content" />
+        <StatusBar barStyle="light-content" backgroundColor="#0A4A4A" />
         <ActivityIndicator size="large" color="#f5f5dc" />
         <Text style={styles.loadingText}>Loading...</Text>
       </View>
@@ -167,10 +180,19 @@ export default function QuranListScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="light-content" backgroundColor="#0A4A4A" />
 
       {/* Header */}
       <View style={styles.header}>
+        {/* Back Button Added */}
+        <TouchableOpacity 
+          style={styles.backButton} 
+          onPress={handleBackPress}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <MaterialCommunityIcons name="arrow-left" size={moderateScale(28)} color="#f5f5dc" />
+        </TouchableOpacity>
+
         <View style={styles.headerDecoration}>
           <View style={styles.decorativeLine} />
           <View style={[styles.decorativeLine, styles.decorativeLineShort]} />
@@ -200,7 +222,7 @@ export default function QuranListScreen() {
               colors={['rgba(210, 180, 140, 0.2)', 'rgba(210, 180, 140, 0.1)']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.recentGradient}
+              style={[styles.recentGradient, { borderWidth: hairline * 2 }]}
             >
               <View style={styles.recentIconContainer}>
                 <Text style={styles.recentIcon}>📖</Text>
@@ -227,10 +249,11 @@ export default function QuranListScreen() {
             style={[
               styles.tabIndicator,
               {
+                width: TAB_WIDTH,
                 transform: [{
                   translateX: slideAnim.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [4, (width - 48) / 2 + 4],
+                    outputRange: [scale(4), TAB_WIDTH + scale(4)],
                   })
                 }]
               }
@@ -284,163 +307,171 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     color: '#f5f5dc',
-    marginTop: 16,
-    fontSize: 16,
+    marginTop: verticalScale(16),
+    fontSize: fontScale(16),
   },
 
   // Header
   header: {
-    paddingTop: Platform.OS === 'android' ? 30 : 20,
-    paddingBottom: 24,
-    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'android' ? verticalScale(30) : verticalScale(10),
+    paddingBottom: verticalScale(24),
+    paddingHorizontal: scale(20),
     alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(245, 245, 220, 0.1)',
+    position: 'relative', // Necessary for absolute positioning of back button
+  },
+  // Back Button Style
+  backButton: {
+    position: 'absolute',
+    left: scale(20),
+    top: Platform.OS === 'android' ? verticalScale(35) : verticalScale(15), 
+    zIndex: 10,
+    padding: scale(4),
   },
   headerDecoration: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
+    gap: scale(8),
+    marginBottom: verticalScale(12),
   },
   decorativeLine: {
-    width: 40,
-    height: 2,
+    width: scale(40),
+    height: verticalScale(2),
     backgroundColor: '#f5f5dc',
     borderRadius: 1,
   },
   decorativeLineShort: {
-    width: 20,
+    width: scale(20),
   },
   headerTitle: {
-    fontSize: 30,
+    fontSize: fontScale(28), 
     fontWeight: 'bold',
     color: '#f5f5dc',
-    marginBottom: 4,
+    marginBottom: verticalScale(4),
     letterSpacing: 1,
   },
   headerSubtitle: {
-    fontSize: 16,
+    fontSize: fontScale(15),
     color: '#D2B48C',
     fontWeight: '600',
-    marginBottom: 12,
+    marginBottom: verticalScale(12),
   },
 
   // Recent Section
   recentSection: {
-    marginTop: 20,
-    marginBottom: 16,
-    paddingHorizontal: 20,
+    marginTop: verticalScale(20),
+    marginBottom: verticalScale(16),
+    paddingHorizontal: wp('5%'),
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: verticalScale(12),
   },
   sectionDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: moderateScale(8),
+    height: moderateScale(8),
+    borderRadius: moderateScale(4),
     backgroundColor: '#D2B48C',
-    marginRight: 8,
+    marginRight: scale(8),
   },
   sectionTitle: {
     color: '#f5f5dc',
-    fontSize: 16,
+    fontSize: fontScale(15),
     fontWeight: 'bold',
   },
   recentCard: {
-    borderRadius: 16,
+    borderRadius: moderateScale(16),
     overflow: 'hidden',
-    elevation: 5,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
+    shadowOffset: { width: 0, height: verticalScale(3) },
     shadowOpacity: 0.3,
-    shadowRadius: 6,
+    shadowRadius: moderateScale(6),
   },
   recentGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 18,
-    borderWidth: 1,
+    padding: scale(18),
     borderColor: 'rgba(210, 180, 140, 0.3)',
   },
   recentIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: moderateScale(50),
+    height: moderateScale(50),
+    borderRadius: moderateScale(25),
     backgroundColor: 'rgba(245, 245, 220, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
     borderColor: 'rgba(245, 245, 220, 0.2)',
-    marginRight: 14,
+    marginRight: scale(14),
   },
   recentIcon: {
-    fontSize: 26,
+    fontSize: fontScale(24),
   },
   recentContent: {
     flex: 1,
   },
   recentName: {
     color: '#f5f5dc',
-    fontSize: 19,
+    fontSize: fontScale(18),
     fontWeight: 'bold',
-    marginBottom: 4,
+    marginBottom: verticalScale(4),
   },
   recentMeta: {
     color: '#B8A488',
-    fontSize: 12,
+    fontSize: fontScale(11),
   },
   resumeButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(245, 245, 220, 0.15)',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
+    paddingHorizontal: scale(14),
+    paddingVertical: verticalScale(8),
+    borderRadius: moderateScale(20),
     borderWidth: 1,
     borderColor: 'rgba(245, 245, 220, 0.2)',
   },
   resumeText: {
     color: '#f5f5dc',
     fontWeight: 'bold',
-    marginRight: 4,
-    fontSize: 13,
+    marginRight: scale(4),
+    fontSize: fontScale(12),
   },
   resumeArrow: {
     color: '#f5f5dc',
-    fontSize: 18,
+    fontSize: fontScale(16),
     fontWeight: 'bold',
   },
 
   // Tab Bar
   tabSection: {
-    paddingHorizontal: 20,
-    marginBottom: 16,
+    alignItems: 'center',
+    marginBottom: verticalScale(16),
   },
   tabBar: {
+    width: wp('90%'),
     flexDirection: 'row',
     backgroundColor: 'rgba(0, 0, 0, 0.25)',
-    borderRadius: 12,
-    padding: 4,
+    borderRadius: moderateScale(12),
+    padding: scale(4),
     position: 'relative',
     borderWidth: 1,
     borderColor: 'rgba(245, 245, 220, 0.15)',
   },
   tabIndicator: {
     position: 'absolute',
-    top: 4,
-    width: (width - 48) / 2 - 4,
-    height: 44,
+    top: scale(4),
+    height: '100%',
+    maxHeight: verticalScale(44),
     backgroundColor: '#0D5F5F',
-    borderRadius: 10,
+    borderRadius: moderateScale(10),
     borderWidth: 1,
     borderColor: 'rgba(245, 245, 220, 0.2)',
   },
   tab: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: verticalScale(12),
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1,
@@ -448,7 +479,7 @@ const styles = StyleSheet.create({
   tabText: {
     color: '#B8A488',
     fontWeight: '600',
-    fontSize: 15,
+    fontSize: fontScale(14),
   },
   activeTabText: {
     color: '#f5f5dc',
@@ -457,26 +488,23 @@ const styles = StyleSheet.create({
 
   // List
   listContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingHorizontal: wp('5%'),
+    paddingBottom: verticalScale(20),
   },
 
   // Card
   card: {
-    marginBottom: 14,
-    borderRadius: 16,
+    marginBottom: verticalScale(14),
+    borderRadius: moderateScale(16),
     overflow: 'hidden',
-    elevation: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
-    shadowRadius: 5,
+    shadowRadius: moderateScale(5),
   },
   cardGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 18,
-    borderWidth: 1,
+    padding: scale(16),
     borderColor: 'rgba(245, 245, 220, 0.2)',
     position: 'relative',
   },
@@ -484,18 +512,18 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     right: 0,
-    width: 40,
-    height: 40,
+    width: moderateScale(40),
+    height: moderateScale(40),
     backgroundColor: 'rgba(245, 245, 220, 0.08)',
-    borderBottomLeftRadius: 40,
+    borderBottomLeftRadius: moderateScale(40),
   },
   badgeContainer: {
-    marginRight: 16,
+    marginRight: scale(14),
   },
   badge: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: moderateScale(46),
+    height: moderateScale(46),
+    borderRadius: moderateScale(23),
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(245, 245, 220, 0.15)',
@@ -504,23 +532,23 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     color: '#f5f5dc',
-    fontSize: 17,
+    fontSize: fontScale(15),
     fontWeight: 'bold',
   },
   middleSection: {
     flex: 1,
-    marginRight: 12,
+    marginRight: scale(8),
   },
   cardTitle: {
     color: '#f5f5dc',
-    fontSize: 18,
+    fontSize: fontScale(16),
     fontWeight: 'bold',
-    marginBottom: 4,
+    marginBottom: verticalScale(4),
   },
   cardTranslation: {
     color: '#B8A488',
-    fontSize: 13,
-    marginBottom: 10,
+    fontSize: fontScale(12),
+    marginBottom: verticalScale(8),
   },
   metaRow: {
     flexDirection: 'row',
@@ -529,10 +557,10 @@ const styles = StyleSheet.create({
   typeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-    gap: 6,
+    paddingHorizontal: scale(8),
+    paddingVertical: verticalScale(4),
+    borderRadius: moderateScale(12),
+    gap: scale(6),
   },
   makkiBadge: {
     backgroundColor: 'rgba(210, 180, 140, 0.2)',
@@ -541,40 +569,40 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(176, 196, 222, 0.2)',
   },
   typeDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
+    width: moderateScale(5),
+    height: moderateScale(5),
+    borderRadius: moderateScale(2.5),
     backgroundColor: '#f5f5dc',
   },
   typeText: {
-    fontSize: 11,
+    fontSize: fontScale(10),
     fontWeight: '600',
     color: '#f5f5dc',
   },
   divider: {
     width: 1,
-    height: 16,
+    height: verticalScale(14),
     backgroundColor: 'rgba(245, 245, 220, 0.2)',
-    marginHorizontal: 10,
+    marginHorizontal: scale(8),
   },
   verseCount: {
     color: '#B8A488',
-    fontSize: 11,
+    fontSize: fontScale(10),
     fontWeight: '500',
   },
   rightSection: {
     alignItems: 'flex-end',
-    gap: 8,
+    gap: verticalScale(6),
   },
   arabicName: {
     color: '#f5f5dc',
-    fontSize: 22,
+    fontSize: fontScale(20),
     fontWeight: '600',
   },
   chevronCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: moderateScale(28),
+    height: moderateScale(28),
+    borderRadius: moderateScale(14),
     backgroundColor: 'rgba(245, 245, 220, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -583,7 +611,7 @@ const styles = StyleSheet.create({
   },
   chevron: {
     color: '#f5f5dc',
-    fontSize: 20,
+    fontSize: fontScale(18),
     fontWeight: 'bold',
   },
 });

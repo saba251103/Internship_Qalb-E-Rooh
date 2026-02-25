@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 
 export default function TabLayout() {
@@ -11,7 +11,7 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: "#0a3d3d",
           borderTopColor: "#0d4a4a",
-          height: 60,
+          height: 80,
         },
       }}
     >
@@ -21,74 +21,72 @@ export default function TabLayout() {
         options={{
           title: "Home",
           tabBarIcon: ({ focused, color }) => (
-            <Ionicons
+            <MaterialCommunityIcons
               name={focused ? "home" : "home-outline"}
-              size={22}
+              size={24}
               color={color}
             />
+          ),
+        }}
+      />
+      {/* Qibla */}
+      <Tabs.Screen
+        name="qibla"
+        options={{
+          title: "Qibla",
+          tabBarIcon: ({ focused, color }) => (
+          <MaterialCommunityIcons
+            name={focused ? "compass" : "compass-outline"}
+            size={24}
+            color={color}
+          />
           ),
         }}
       />
 
-      {/* Capella */}
+      {/* Quran */}
       <Tabs.Screen
-        name="library"
+        name="quran"
         options={{
-          title: "Capella",
+          title: "Quran",
+          tabBarIcon: ({ focused, color }) => (
+          <MaterialCommunityIcons
+            name={focused ? "book-open-variant" : "book-open-outline"}
+            size={24}
+            color={color}
+          />
+          ),
+        }}
+      />
+      {/* Prayer */}
+      <Tabs.Screen
+        name="prayer"
+        options={{
+          title: "Prayer",
           tabBarIcon: ({ focused, color }) => (
             <Ionicons
-              name={focused ? "musical-note" : "musical-note-outline"}
+              name={focused ? "time" : "time-outline"}
               size={22}
               color={color}
             />
+          ),
+        }}
+      />
+      {/* Tasbeeh */}
+      <Tabs.Screen
+        name="tasbeeh"
+        options={{
+          title: "Tasbeeh",
+          tabBarIcon: ({ focused, color }) => (
+              <MaterialCommunityIcons
+                name="counter"
+                size={24}
+                color={color}
+              />
           ),
         }}
       />
 
-      {/* Videos */}
-      <Tabs.Screen
-        name="videos"
-        options={{
-          title: "Videos",
-          tabBarIcon: ({ focused, color }) => (
-            <Ionicons
-              name={focused ? "play" : "play-outline"}
-              size={22}
-              color={color}
-            />
-          ),
-        }}
-      />
-
-      {/* Ask Rubina */}
-      <Tabs.Screen
-        name="ask-rubina"
-        options={{
-          title: "Ask Rubina",
-          tabBarIcon: ({ focused, color }) => (
-            <Ionicons
-              name={focused ? "chatbubble" : "chatbubble-outline"}
-              size={22}
-              color={color}
-            />
-          ),
-        }}
-      />
-
-      {/* Profile */}
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: "Profile",
-          tabBarIcon: ({ focused, color }) => (
-            <Ionicons
-              name={focused ? "person" : "person-outline"}
-              size={22}
-              color={color}
-            />
-          ),
-        }}
-      />
     </Tabs>
   );
 }

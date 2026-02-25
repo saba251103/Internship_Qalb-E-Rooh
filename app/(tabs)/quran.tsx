@@ -1,9 +1,10 @@
 // app/(tabs)/quran.tsx
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import {
-  Dimensions,
+  PixelRatio,
   Platform,
   SafeAreaView,
   StatusBar,
@@ -13,7 +14,8 @@ import {
   View
 } from 'react-native';
 
-const { width } = Dimensions.get('window');
+import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
+import { moderateScale, scale, verticalScale } from 'react-native-size-matters';
 
 const QuranScreen = () => {
   const router = useRouter();
@@ -22,12 +24,27 @@ const QuranScreen = () => {
     router.push('/screens/quran_list' as any);
   };
 
+  const handleBackPress = () => {
+    router.push('/(tabs)' as any);
+  };
+
+  const thinBorder = 1 / PixelRatio.get();
+
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="light-content" backgroundColor="#0A4A4A" />
       
       {/* Header Section */}
       <View style={styles.header}>
+        {/* Back Button */}
+        <TouchableOpacity 
+          style={styles.backButton} 
+          onPress={handleBackPress}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <MaterialCommunityIcons name="arrow-left" size={moderateScale(28)} color="#FFFFFF" />
+        </TouchableOpacity>
+
         <View style={styles.decorativeLine} />
         <Text style={styles.title}>القرآن الكريم</Text>
         <Text style={styles.titleEnglish}>The Holy Quran</Text>
@@ -37,21 +54,26 @@ const QuranScreen = () => {
 
       {/* Main Content */}
       <View style={styles.content}>
+        
         {/* Featured Card */}
         <TouchableOpacity 
-          style={styles.card} 
           onPress={handleListPress}
           activeOpacity={0.8}
+          style={styles.cardContainer}
         >
           <LinearGradient
             colors={['rgba(26, 95, 95, 0.2)', 'rgba(245, 245, 220, 0.1)']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.cardGradient}
+            style={[styles.cardGradient, { borderWidth: thinBorder * 2 }]} 
           >
             <View style={styles.cardContent}>
               <View style={styles.iconCircle}>
-                <Text style={styles.icon}>📖</Text>
+                <MaterialCommunityIcons 
+                  name="book-open-page-variant" 
+                  size={moderateScale(32)} 
+                  color="#f5f5dc" 
+                />
               </View>
               
               <View style={styles.cardTextContainer}>
@@ -72,7 +94,11 @@ const QuranScreen = () => {
               </View>
 
               <View style={styles.arrowContainer}>
-                <Text style={styles.arrow}>›</Text>
+                <MaterialCommunityIcons 
+                  name="chevron-right" 
+                  size={moderateScale(28)} 
+                  color="#f5f5dc" 
+                />
               </View>
             </View>
           </LinearGradient>
@@ -96,84 +122,89 @@ const styles = StyleSheet.create({
     backgroundColor: '#0A4A4A',
   },
   header: {
-    paddingTop: Platform.OS === 'android' ? 20 : 10,
-    paddingBottom: 30,
+    paddingTop: Platform.OS === 'android' ? verticalScale(40) : verticalScale(10),
+    paddingBottom: verticalScale(20),
     alignItems: 'center',
+    position: 'relative', // Necessary for absolute positioning of back button
+  },
+  // New Style for Back Button
+  backButton: {
+    position: 'absolute',
+    left: scale(20), // Aligned with content padding
+    top: Platform.OS === 'android' ? verticalScale(40) : verticalScale(10), // Aligned with status bar padding
+    zIndex: 10,
+    padding: scale(4), // Little extra touch area
   },
   decorativeLine: {
-    width: 60,
-    height: 2,
+    width: scale(60),
+    height: verticalScale(2),
     backgroundColor: 'rgba(76, 175, 80, 0.5)',
-    marginVertical: 12,
+    marginVertical: verticalScale(12),
   },
   title: {
-    fontSize: 32,
+    fontSize: moderateScale(32),
     fontWeight: '700',
     color: '#FFFFFF',
-    marginBottom: 4,
+    marginBottom: verticalScale(4),
     letterSpacing: 1,
+    textAlign: 'center',
   },
   titleEnglish: {
-    fontSize: 20,
+    fontSize: moderateScale(20),
     fontWeight: '600',
     color: '#f5f5dc',
-    marginBottom: 8,
+    marginBottom: verticalScale(8),
     letterSpacing: 0.5,
   },
   subtitle: {
-    fontSize: 15,
+    fontSize: moderateScale(14),
     color: '#88A09E',
     fontStyle: 'italic',
   },
   content: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: wp('5%'),
+    paddingTop: hp('2%'),
   },
-  card: {
-    borderRadius: 20,
-    overflow: 'hidden',
-    elevation: 8,
+  cardContainer: {
+    borderRadius: moderateScale(20),
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: verticalScale(4) },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowRadius: moderateScale(8),
   },
   cardGradient: {
-    borderWidth: 1,
     borderColor: '#a8c5c5',
-    borderRadius: 20,
+    borderRadius: moderateScale(20),
   },
   cardContent: {
     flexDirection: 'row',
-    padding: 24,
+    padding: scale(24),
     alignItems: 'center',
   },
   iconCircle: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: moderateScale(70),
+    height: moderateScale(70),
+    borderRadius: moderateScale(35),
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
     borderColor: 'rgba(245, 245, 220, 0.1)',
   },
-  icon: {
-    fontSize: 32,
-  },
   cardTextContainer: {
-    flex: 1,
-    marginLeft: 20,
+    flex: 1, 
+    marginLeft: scale(20),
   },
   cardTitle: {
-    fontSize: 22,
+    fontSize: moderateScale(22),
     fontWeight: 'bold',
     color: '#FFFFFF',
-    marginBottom: 4,
+    marginBottom: verticalScale(4),
   },
   cardSubtitle: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     color: '#f5f5dc',
-    marginBottom: 16,
+    marginBottom: verticalScale(12),
   },
   statsContainer: {
     flexDirection: 'row',
@@ -183,51 +214,46 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statNumber: {
-    fontSize: 18,
+    fontSize: moderateScale(16),
     fontWeight: 'bold',
     color: '#f5f5dc',
   },
   statLabel: {
-    fontSize: 11,
+    fontSize: moderateScale(10),
     color: '#88A09E',
-    marginTop: 2,
+    marginTop: verticalScale(2),
   },
   statDivider: {
     width: 1,
-    height: 30,
+    height: verticalScale(25),
     backgroundColor: 'rgba(76, 175, 80, 0.3)',
-    marginHorizontal: 20,
+    marginHorizontal: scale(15),
   },
   arrowContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: moderateScale(40),
+    height: moderateScale(40),
+    borderRadius: moderateScale(20),
     backgroundColor: 'rgba(245, 245, 220, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  arrow: {
-    fontSize: 28,
-    color: '#f5f5dc',
-    fontWeight: 'bold',
-  },
   infoSection: {
-    marginTop: 40,
-    padding: 20,
+    marginTop: hp('5%'), 
+    padding: scale(20),
     backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    borderRadius: 16,
-    borderLeftWidth: 3,
+    borderRadius: moderateScale(16),
+    borderLeftWidth: scale(3),
     borderLeftColor: '#f5f5dc',
   },
   infoText: {
-    fontSize: 15,
+    fontSize: moderateScale(14),
     color: '#FFFFFF',
-    lineHeight: 24,
+    lineHeight: verticalScale(24),
     fontStyle: 'italic',
-    marginBottom: 8,
+    marginBottom: verticalScale(8),
   },
   infoReference: {
-    fontSize: 13,
+    fontSize: moderateScale(12),
     color: '#f5f5dc',
     textAlign: 'right',
     fontWeight: '600',

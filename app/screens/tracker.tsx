@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router"; // 1. Import useRouter
+import { useRouter } from "expo-router";
 import moment from "moment-hijri";
 import React, { useEffect, useState } from "react";
 import {
@@ -11,9 +11,11 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { Calendar } from "react-native-calendars";
+// 1. SAFE AREA IMPORTS
+import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Prayer = "Fajr" | "Dhuhr" | "Asr" | "Maghrib" | "Isha";
 const prayers: Prayer[] = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"];
@@ -25,8 +27,20 @@ const prayerArabic = {
   Isha: "العشاء",
 };
 
-export default function NamazTracker() {
-  const router = useRouter(); // 2. Initialize router
+// 2. ROOT WRAPPER
+export default function NamazTrackerWrapper() {
+  return (
+    <SafeAreaProvider>
+      <NamazTracker />
+    </SafeAreaProvider>
+  );
+}
+
+function NamazTracker() {
+  const router = useRouter();
+  // 3. INSETS HOOK
+  const insets = useSafeAreaInsets();
+  
   const today = moment().format("YYYY-MM-DD");
   
   const [selectedDate, setSelectedDate] = useState(today);
@@ -75,10 +89,10 @@ export default function NamazTracker() {
 
   const showMashaAllah = (type: 'fasting' | 'prayers') => {
     const config = type === 'fasting' 
-      ? { title: "MashaAllah! ✨", message: "Your fast has been recorded. May Allah accept your sacrifice and grant you the highest rewards.", icon: "star-face" }
-      : { title: "MashaAllah! 🤲", message: "All prayers for today are complete! Your dedication to your Salah is beautiful.", icon: "check-decagram" };
+      ? { title: "MashaAllah! ✨", message: "Your fast has been recorded. May Allah accept your sacrifice.", icon: "star-face" }
+      : { title: "MashaAllah! 🤲", message: "All prayers for today are complete! Your dedication is beautiful.", icon: "check-decagram" };
     
-    setModalConfig(config);
+    setModalConfig(config as any);
     setModalVisible(true);
   };
 
@@ -145,15 +159,18 @@ export default function NamazTracker() {
 
   return (
     <LinearGradient colors={["#0A4A4A", "#073333", "#041F1F"]} style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
       
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      {/* 4. DYNAMIC PADDING FOR LIST */}
+      <ScrollView 
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 20 }]}
+      >
         
         {/* Header Section */}
         <View style={styles.header}>
-          {/* 3. Back Arrow Implementation */}
           <TouchableOpacity 
-            onPress={() => router.push("./features")} 
+            onPress={() => router.back()} 
             style={styles.backButton}
             accessibilityLabel="Go back"
           >
@@ -178,7 +195,7 @@ export default function NamazTracker() {
           <Calendar
             markingType="custom"
             markedDates={calendarMarkings}
-            onDayPress={(day) => setSelectedDate(day.dateString)}
+            onDayPress={(day: any) => setSelectedDate(day.dateString)}
             theme={{
               calendarBackground: "transparent",
               textSectionTitleColor: "#6EE7B7",
@@ -225,7 +242,10 @@ export default function NamazTracker() {
                 </View>
                 <Text style={[styles.prayerName, prayerState[prayer] && styles.textWhite]}>{prayer}</Text>
               </View>
-              <Text style={[styles.prayerArabic, prayerState[prayer] && styles.textWhite]}>{prayerArabic[prayer]}</Text>
+              {/* 5. ARABIC TEXT FIX */}
+              <Text style={[styles.prayerArabic, prayerState[prayer] && styles.textWhite]}>
+                {prayerArabic[prayer]}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -251,9 +271,11 @@ export default function NamazTracker() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scrollContent: { paddingTop: 60, paddingBottom: 40 },
-  header: { paddingHorizontal: 15, marginBottom: 25, flexDirection: 'row', alignItems: 'center' },
-  backButton: { width: 40, height: 40, justifyContent: 'center', alignItems: 'flex-start' }, // Added style for button
+  scrollContent: { 
+    // Padding handled dynamically in component via style prop
+  },
+  header: { paddingHorizontal: 20, marginBottom: 25, flexDirection: 'row', alignItems: 'center' },
+  backButton: { width: 40, height: 40, justifyContent: 'center', alignItems: 'flex-start' },
   headerTitle: { fontSize: 24, fontWeight: "900", color: "#FFF", letterSpacing: -0.5 },
   hijriText: { color: "#6EE7B7", fontSize: 13, fontWeight: "600" },
   
@@ -287,7 +309,13 @@ const styles = StyleSheet.create({
   checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: "#6EE7B7", justifyContent: 'center', alignItems: 'center' },
   checkboxChecked: { backgroundColor: "#0A4A4A", borderColor: "#0A4A4A" },
   prayerName: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
-  prayerArabic: { color: "rgba(255,255,255,0.4)", fontSize: 18, fontWeight: 'bold' },
+  prayerArabic: { 
+    color: "rgba(255,255,255,0.4)", 
+    fontSize: 18, 
+    fontWeight: 'bold',
+    includeFontPadding: false, // Critical for Android Arabic
+    textAlignVertical: 'center' 
+  },
   textWhite: { color: "#FFF" },
 
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.85)", justifyContent: "center", alignItems: "center" },

@@ -1,13 +1,13 @@
 import { Audio } from 'expo-av';
 import { useFonts } from 'expo-font';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
-  Dimensions,
   Modal,
+  PixelRatio,
   Platform,
   SafeAreaView,
   StatusBar,
@@ -18,7 +18,17 @@ import {
   View
 } from 'react-native';
 
-const { width } = Dimensions.get('window');
+// Library 1: react-native-responsive-screen (Percentage layouts)
+import { widthPercentageToDP as wp } from 'react-native-responsive-screen';
+
+// Library 2: react-native-size-matters (Scaling fonts/spacing)
+import { moderateScale, scale, verticalScale } from 'react-native-size-matters';
+
+// --- HELPER: Font Scaling ---
+// Android often scales text too aggressively. This helper keeps it balanced.
+const fontScale = (size: number, factor = 0.3) => {
+  return Platform.OS === 'android' ? moderateScale(size, factor) : moderateScale(size);
+};
 
 export interface Ayah {
   number: number;
@@ -28,10 +38,14 @@ export interface Ayah {
 }
 
 const SurahDetailScreen = () => {
+  const router = useRouter();
   const params = useLocalSearchParams();
   const surahNumber = params.surahNumber as string;
   const juzNumber = params.juzNumber as string;
   const surahName = params.surahName as string;
+
+  // PixelRatio: Thinnest possible line for borders
+  const hairline = 1 / PixelRatio.get();
 
   const [fontsLoaded] = useFonts({
     'IndoPakQuran': require('../../assets/fonts/IndoPakQuran.ttf'),
@@ -43,9 +57,10 @@ const SurahDetailScreen = () => {
   const [playingAyah, setPlayingAyah] = useState<number | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   
-  // --- NEW SETTINGS STATE ---
+  // Settings State
   const [settingsVisible, setSettingsVisible] = useState(false);
-  const [arabicFontSize, setArabicFontSize] = useState(32);
+  // Default font size scaled slightly for different screens
+  const [arabicFontSize, setArabicFontSize] = useState(fontScale(28)); 
   const [showTranslation, setShowTranslation] = useState(true);
   
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -53,16 +68,14 @@ const SurahDetailScreen = () => {
   useEffect(() => {
     fetchData();
     return () => {
-      if (sound) {
-        sound.unloadAsync();
-      }
+      if (sound) sound.unloadAsync();
     };
   }, [surahNumber, juzNumber]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const arabicEdition = "quran-indian";
+      const arabicEdition = "quran-indian"; // IndoPak script
       const translationEdition = "en.sahih";
       let combined: Ayah[] = [];
 
@@ -90,7 +103,6 @@ const SurahDetailScreen = () => {
           translation: jsonEn.data.ayahs[i].text
         }));
       }
-
       setAyahs(combined);
     } catch (error) {
       console.error("Fetch Error:", error);
@@ -107,10 +119,7 @@ const SurahDetailScreen = () => {
         setPlayingAyah(null);
         return;
       }
-
-      if (sound) {
-        await sound.unloadAsync();
-      }
+      if (sound) await sound.unloadAsync();
 
       const { sound: newSound } = await Audio.Sound.createAsync(
         { uri: `https://cdn.islamic.network/quran/audio/128/ar.alafasy/${globalNumber}.mp3` },
@@ -132,7 +141,7 @@ const SurahDetailScreen = () => {
     }
   };
 
-  // --- SETTINGS MODAL COMPONENT ---
+  // --- SETTINGS MODAL ---
   const renderSettingsModal = () => (
     <Modal
       animationType="fade"
@@ -141,7 +150,7 @@ const SurahDetailScreen = () => {
       onRequestClose={() => setSettingsVisible(false)}
     >
       <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
+        <View style={[styles.modalContent, { borderWidth: hairline * 2 }]}>
           <Text style={styles.modalTitle}>View Settings</Text>
           
           <View style={styles.settingRow}>
@@ -149,12 +158,13 @@ const SurahDetailScreen = () => {
             <View style={styles.fontSizeControls}>
               <TouchableOpacity 
                 style={styles.controlButton} 
-                onPress={() => setArabicFontSize(prev => Math.max(20, prev - 2))}
+                onPress={() => setArabicFontSize(prev => Math.max(15, prev - 2))}
               >
                 <Text style={styles.controlButtonText}>-</Text>
               </TouchableOpacity>
               
-              <Text style={styles.fontSizeValue}>{arabicFontSize}</Text>
+              {/* Display rounded font size */}
+              <Text style={styles.fontSizeValue}>{Math.round(arabicFontSize)}</Text>
               
               <TouchableOpacity 
                 style={styles.controlButton} 
@@ -190,13 +200,21 @@ const SurahDetailScreen = () => {
 
   const renderHeader = () => {
     const headerOpacity = scrollY.interpolate({
-      inputRange: [0, 100],
+      inputRange: [0, verticalScale(100)],
       outputRange: [1, 0.4],
       extrapolate: 'clamp',
     });
 
     return (
       <Animated.View style={[styles.headerContainer, { opacity: headerOpacity }]}>
+        {/* Back Button */}
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <Text style={styles.settingsIcon}>‹</Text>
+        </TouchableOpacity>
+
         {/* Settings Button */}
         <TouchableOpacity 
           style={styles.settingsButton}
@@ -224,14 +242,14 @@ const SurahDetailScreen = () => {
           </View>
         </View>
 
-        {/* Bismillah Card */}
+        {/* Bismillah Card (Only for Surahs, excluding Surah 9) */}
         {surahNumber && surahNumber !== '9' && surahNumber !== '1' && (
           <View style={styles.bismillahCard}>
             <LinearGradient
               colors={['rgba(210, 180, 140, 0.15)', 'rgba(210, 180, 140, 0.08)']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.bismillahGradient}
+              style={[styles.bismillahGradient, { borderWidth: hairline }]}
             >
               <Text style={styles.bismillahText}>بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ</Text>
             </LinearGradient>
@@ -254,7 +272,7 @@ const SurahDetailScreen = () => {
           }
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.cardGradient}
+          style={[styles.cardGradient, { borderWidth: hairline * 2 }]}
         >
           <View style={styles.cornerDecoration}>
             <View style={styles.cornerLine} />
@@ -263,7 +281,7 @@ const SurahDetailScreen = () => {
 
           <View style={styles.ayaHeader}>
             <View style={styles.badgeWrapper}>
-              <View style={styles.badge}>
+              <View style={[styles.badge, { borderWidth: hairline * 2 }]}>
                 <Text style={styles.badgeText}>{item.numberInSurah}</Text>
               </View>
             </View>
@@ -273,7 +291,11 @@ const SurahDetailScreen = () => {
               onPress={() => playAudio(item.number, item.numberInSurah)}
               activeOpacity={0.7}
             >
-              <View style={[styles.audioButtonInner, isCurrentlyPlaying && styles.audioButtonPlaying]}>
+              <View style={[
+                styles.audioButtonInner, 
+                isCurrentlyPlaying && styles.audioButtonPlaying,
+                { borderWidth: hairline }
+              ]}>
                 <Text style={styles.audioIcon}>{isCurrentlyPlaying ? '⏸' : '▶'}</Text>
                 <Text style={styles.audioText}>
                   {isCurrentlyPlaying ? 'Pause' : 'Play'}
@@ -288,7 +310,7 @@ const SurahDetailScreen = () => {
               styles.arabicText, 
               { 
                 fontSize: arabicFontSize, 
-                lineHeight: arabicFontSize * 2 
+                lineHeight: arabicFontSize * 2 // Line height scales with font size
               }
             ]}>
               {item.text}
@@ -310,7 +332,7 @@ const SurahDetailScreen = () => {
   if (loading || !fontsLoaded) {
     return (
       <View style={styles.loadingContainer}>
-        <StatusBar barStyle="light-content" />
+        <StatusBar barStyle="light-content" backgroundColor="#0A4A4A" />
         <ActivityIndicator size="large" color="#f5f5dc" />
         <Text style={styles.loadingText}>Loading verses...</Text>
       </View>
@@ -319,7 +341,7 @@ const SurahDetailScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="light-content" backgroundColor="#0A4A4A" />
       {renderSettingsModal()}
       
       <Animated.FlatList
@@ -352,11 +374,11 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     color: '#f5f5dc',
-    marginTop: 16,
-    fontSize: 16,
+    marginTop: verticalScale(16),
+    fontSize: fontScale(16),
   },
   listContent: {
-    paddingBottom: 40,
+    paddingBottom: verticalScale(40),
   },
 
   // --- MODAL STYLES ---
@@ -367,49 +389,47 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    width: '80%',
-    backgroundColor: '#1a5c5c', // Slightly lighter than background
-    borderRadius: 20,
-    padding: 24,
-    borderWidth: 1,
+    width: wp('85%'), // Responsive width
+    backgroundColor: '#1a5c5c',
+    borderRadius: moderateScale(20),
+    padding: scale(24),
     borderColor: '#D2B48C',
-    elevation: 10,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: fontScale(20),
     fontWeight: 'bold',
     color: '#f5f5dc',
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: verticalScale(20),
   },
   settingRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: verticalScale(16),
   },
   settingLabel: {
     color: '#f5f5dc',
-    fontSize: 16,
+    fontSize: fontScale(16),
     fontWeight: '500',
   },
   fontSizeControls: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: scale(12),
   },
   fontSizeValue: {
     color: '#D2B48C',
-    fontSize: 18,
+    fontSize: fontScale(18),
     fontWeight: 'bold',
-    width: 30,
+    width: scale(30),
     textAlign: 'center',
   },
   controlButton: {
     backgroundColor: 'rgba(245, 245, 220, 0.1)',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: moderateScale(36),
+    height: moderateScale(36),
+    borderRadius: moderateScale(18),
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
@@ -417,48 +437,57 @@ const styles = StyleSheet.create({
   },
   controlButtonText: {
     color: '#f5f5dc',
-    fontSize: 20,
-    lineHeight: 22,
+    fontSize: fontScale(20),
   },
   divider: {
     height: 1,
     backgroundColor: 'rgba(245, 245, 220, 0.1)',
-    marginVertical: 16,
+    marginVertical: verticalScale(16),
   },
   closeButton: {
     backgroundColor: '#D2B48C',
-    paddingVertical: 12,
-    borderRadius: 12,
-    marginTop: 10,
+    paddingVertical: verticalScale(12),
+    borderRadius: moderateScale(12),
+    marginTop: verticalScale(10),
     alignItems: 'center',
   },
   closeButtonText: {
     color: '#0A4A4A',
     fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: fontScale(16),
   },
 
-  // Header
+  // --- HEADER STYLES ---
   headerContainer: {
-    paddingTop: Platform.OS === 'android' ? 30 : 20,
-    marginBottom: 20,
+    paddingTop: Platform.OS === 'android' ? verticalScale(30) : verticalScale(10),
+    marginBottom: verticalScale(20),
     position: 'relative',
   },
   settingsButton: {
     position: 'absolute',
-    top: Platform.OS === 'android' ? 40 : 30,
-    right: 20,
+    top: Platform.OS === 'android' ? verticalScale(40) : verticalScale(30),
+    right: scale(20),
     zIndex: 10,
-    padding: 8,
+    padding: scale(8),
     backgroundColor: 'rgba(0,0,0,0.2)',
-    borderRadius: 20,
+    borderRadius: moderateScale(20),
+  },
+  backButton: {
+    position: 'absolute',
+    top: Platform.OS === 'android' ? verticalScale(40) : verticalScale(30),
+    left: scale(20),
+    zIndex: 10,
+    padding: scale(8),
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    borderRadius: moderateScale(20),
   },
   settingsIcon: {
-    fontSize: 20,
+    fontSize: fontScale(20),
+    color: '#f5f5dc',
   },
   headerContent: {
-    paddingVertical: 24,
-    paddingHorizontal: 20,
+    paddingVertical: verticalScale(24),
+    paddingHorizontal: scale(20),
     alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(245, 245, 220, 0.1)',
@@ -466,95 +495,92 @@ const styles = StyleSheet.create({
   headerDecoration: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 16,
+    gap: scale(10),
+    marginBottom: verticalScale(16),
   },
   decorativeLine: {
-    width: 50,
-    height: 2,
+    width: scale(50),
+    height: verticalScale(2),
     backgroundColor: '#f5f5dc',
     borderRadius: 1,
   },
   decorativeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: moderateScale(6),
+    height: moderateScale(6),
+    borderRadius: moderateScale(3),
     backgroundColor: '#D2B48C',
   },
   surahTitle: {
-    fontSize: 28,
+    fontSize: fontScale(28),
     fontWeight: 'bold',
     color: '#f5f5dc',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: verticalScale(8),
   },
   surahMeta: {
-    fontSize: 14,
+    fontSize: fontScale(14),
     color: '#D2B48C',
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: verticalScale(16),
     fontWeight: '600',
   },
 
-  // Bismillah Card
+  // --- BISMILLAH CARD ---
   bismillahCard: {
-    marginHorizontal: 20,
-    marginTop: 20,
-    borderRadius: 16,
+    marginHorizontal: wp('5%'),
+    marginTop: verticalScale(20),
+    borderRadius: moderateScale(16),
     overflow: 'hidden',
-    elevation: 5,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
+    shadowOffset: { width: 0, height: verticalScale(3) },
     shadowOpacity: 0.3,
-    shadowRadius: 6,
+    shadowRadius: moderateScale(6),
   },
   bismillahGradient: {
-    padding: 28,
-    borderWidth: 1,
+    padding: scale(28),
     borderColor: 'rgba(210, 180, 140, 0.3)',
     alignItems: 'center',
   },
   bismillahText: {
-    fontSize: 28,
+    fontSize: fontScale(24), // Dynamic font
     color: '#f5f5dc',
     textAlign: 'center',
     fontWeight: '600',
-    lineHeight: 46,
-    marginBottom: 5,
+    lineHeight: fontScale(40),
+    marginBottom: verticalScale(5),
+    fontFamily: 'IndoPakQuran',
   },
 
-  // Ayah Card
+  // --- AYAH CARD ---
   ayaCard: {
-    marginHorizontal: 18,
-    marginVertical: 10,
-    borderRadius: 16,
+    marginHorizontal: wp('4.5%'),
+    marginVertical: verticalScale(10),
+    borderRadius: moderateScale(16),
     overflow: 'hidden',
-    elevation: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: verticalScale(2) },
     shadowOpacity: 0.25,
-    shadowRadius: 5,
+    shadowRadius: moderateScale(5),
   },
   cardGradient: {
-    padding: 20,
-    borderWidth: 1,
+    padding: scale(20),
     borderColor: 'rgba(245, 245, 220, 0.2)',
     position: 'relative',
   },
   cornerDecoration: {
     position: 'absolute',
-    top: 12,
-    right: 12,
+    top: scale(12),
+    right: scale(12),
   },
   cornerLine: {
-    width: 20,
-    height: 2,
+    width: scale(20),
+    height: verticalScale(2),
     backgroundColor: 'rgba(245, 245, 220, 0.3)',
     borderRadius: 1,
   },
   cornerLineVertical: {
-    width: 2,
-    height: 20,
+    width: verticalScale(2),
+    height: scale(20),
     position: 'absolute',
     right: 0,
   },
@@ -562,64 +588,62 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: verticalScale(20),
   },
   badgeWrapper: {
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: verticalScale(2) },
     shadowOpacity: 0.2,
     shadowRadius: 3,
   },
   badge: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 20,
-    minWidth: 55,
+    paddingHorizontal: scale(18),
+    paddingVertical: verticalScale(10),
+    borderRadius: moderateScale(20),
+    minWidth: scale(55),
     alignItems: 'center',
     backgroundColor: 'rgba(245, 245, 220, 0.2)',
-    borderWidth: 2,
     borderColor: 'rgba(245, 245, 220, 0.3)',
   },
   badgeText: {
     color: '#f5f5dc',
-    fontSize: 16,
+    fontSize: fontScale(16),
     fontWeight: 'bold',
   },
   audioButton: {
-    borderRadius: 20,
+    borderRadius: moderateScale(20),
   },
   audioButtonInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 8,
+    paddingHorizontal: scale(16),
+    paddingVertical: verticalScale(10),
+    gap: scale(8),
     backgroundColor: 'rgba(245, 245, 220, 0.15)',
-    borderWidth: 1,
     borderColor: 'rgba(245, 245, 220, 0.25)',
-    borderRadius: 20,
+    borderRadius: moderateScale(20),
   },
   audioButtonPlaying: {
     backgroundColor: 'rgba(210, 180, 140, 0.25)',
     borderColor: 'rgba(210, 180, 140, 0.4)',
   },
   audioIcon: {
-    fontSize: 14,
+    fontSize: fontScale(14),
     color: '#f5f5dc',
   },
   audioText: {
     color: '#f5f5dc',
-    fontSize: 13,
+    fontSize: fontScale(13),
     fontWeight: '600',
   },
 
-  // Arabic Text
+  // --- CONTENT ---
   arabicContainer: {
     backgroundColor: 'rgba(0, 0, 0, 0.25)',
-    borderRadius: 12,
-    padding: 22,
-    marginBottom: 18,
-    borderLeftWidth: 3,
+    borderRadius: moderateScale(12),
+    padding: scale(22),
+    marginBottom: verticalScale(18),
+    borderLeftWidth: scale(3),
     borderLeftColor: '#D2B48C',
   },
   arabicText: {
@@ -627,11 +651,10 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     fontFamily: 'IndoPakQuran',
     fontWeight: '500',
+    // fontSize is handled inline via state
   },
-
-  // Translation
   translationContainer: {
-    paddingLeft: 18,
+    paddingLeft: scale(18),
     position: 'relative',
   },
   translationAccent: {
@@ -639,14 +662,14 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    width: 3,
+    width: scale(3),
     backgroundColor: '#D2B48C',
     borderRadius: 2,
   },
   translationText: {
     color: '#C4B5A0',
-    fontSize: 15,
-    lineHeight: 26,
+    fontSize: fontScale(15),
+    lineHeight: verticalScale(24),
     fontWeight: '400',
   },
 });

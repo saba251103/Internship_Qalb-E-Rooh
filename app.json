@@ -13,6 +13,7 @@
       "bundleIdentifier": "com.anonymous.App"
     },
     "android": {
+      "permissions": ["WAKE_LOCK", "FOREGROUND_SERVICE"],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

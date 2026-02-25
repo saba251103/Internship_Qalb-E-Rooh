@@ -1,9 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React, { useState } from "react";
 import { Share, StyleSheet, TouchableOpacity, View } from 'react-native'; // Removed 'onClick' error
 import YoutubePlayer from 'react-native-youtube-iframe';
 const MakkahLiveScreen = () => {
-  const videoId = "Cm1v4bteXbI"; 
+  const router = useRouter();
+  const videoId = "Cm1v4bteXbI";
   const [playing, setPlaying] = useState(true); // 🟢 Default to TRUE for Auto-Play
   const onShare = async () => {
     try {
@@ -21,7 +23,7 @@ const MakkahLiveScreen = () => {
     <View style={styles.container}>
       {/* Header Section */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => console.log('Back pressed')}> 
+        <TouchableOpacity onPress={() => router.back()}> 
           <Ionicons name="chevron-back" size={24} color="white" />
         </TouchableOpacity>
         

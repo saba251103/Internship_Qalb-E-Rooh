@@ -1,26 +1,32 @@
-import { NotoNaskhArabic_700Bold, useFonts } from '@expo-google-fonts/noto-naskh-arabic';
+import { useFonts } from '@expo-google-fonts/noto-naskh-arabic';
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useRef, useState } from "react";
+import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
   Dimensions,
+  FlatList,
   Linking,
+  ListRenderItem,
   Modal,
+  Platform,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import PagerView from "react-native-pager-view";
+// 1. IMPORT SAFE AREA HOOK
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+
 const { width } = Dimensions.get('window');
 
-/* ---------------- DATA ---------------- */
+/* ---------------- DATA TYPES & CONTENT ---------------- */
 
 interface Kalima {
   id: number;
@@ -89,13 +95,65 @@ const kalimas: Kalima[] = [
   },
 ];
 
-/* ---------------- SCREEN ---------------- */
+/* ---------------- COMPONENTS ---------------- */
 
-export default function ShahadahScreen() {
-  let [fontsLoaded] = useFonts({
-    'Traditional-Naskh': NotoNaskhArabic_700Bold,
+// 2. MEMOIZED LIST ITEM (Performance optimization)
+const KalimaCard = memo(({ item, isBookmarked, onPress, onYoutubePress }: { item: Kalima, isBookmarked: boolean, onPress: () => void, onYoutubePress: () => void }) => (
+  <TouchableOpacity
+    style={styles.card}
+    onPress={onPress}
+    activeOpacity={0.9}
+  >
+    <View style={styles.cardLeft}>
+      <LinearGradient colors={['#E8F5F1', '#C8E6E0']} style={styles.circle}>
+        <Text style={styles.num}>{item.id}</Text>
+      </LinearGradient>
+      <View style={styles.cardText}>
+        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+            <Text style={styles.title}>{item.title}</Text>
+            {isBookmarked && (
+                <Ionicons name="bookmark" size={14} color="#0D5252" style={{marginLeft: 6}} />
+            )}
+        </View>
+        <Text style={styles.cardSubTitle}>{item.subtitle}</Text>
+      </View>
+    </View>
+
+    <View style={styles.actionRow}>
+        <TouchableOpacity 
+            onPress={onYoutubePress}
+            style={styles.listYoutubeBtn}
+            hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
+        >
+            <Ionicons name="logo-youtube" size={20} color="#FF0000" />
+        </TouchableOpacity>
+        <View style={styles.arrowCircle}>
+            <Ionicons name="chevron-forward" size={16} color="#0D5252" />
+        </View>
+    </View>
+  </TouchableOpacity>
+));
+
+/* ---------------- MAIN SCREEN ---------------- */
+
+export default function ShahadahScreenWrapper() {
+  return (
+    // 3. SAFE AREA PROVIDER (Required for Insets to work)
+    <SafeAreaProvider>
+      <ShahadahScreen />
+    </SafeAreaProvider>
+  )
+}
+
+function ShahadahScreen() {
+  const [fontsLoaded] = useFonts({
+    'IndoPakQuran': require('../../assets/fonts/IndoPakQuran.ttf'), 
   });
   const router = useRouter();
+  
+  // 4. USE INSETS
+  const insets = useSafeAreaInsets();
+  
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [bookmarks, setBookmarks] = useState<number[]>([]);
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -105,8 +163,10 @@ export default function ShahadahScreen() {
   }, []);
 
   const loadBookmarks = async () => {
-    const data = await AsyncStorage.getItem("kalimaBookmarks");
-    if (data) setBookmarks(JSON.parse(data));
+    try {
+      const data = await AsyncStorage.getItem("kalimaBookmarks");
+      if (data) setBookmarks(JSON.parse(data));
+    } catch (e) { console.log(e); }
   };
 
   const toggleBookmark = async (id: number) => {
@@ -128,6 +188,15 @@ export default function ShahadahScreen() {
     Linking.openURL(url).catch((err) => console.error("Couldn't load page", err));
   };
 
+  const renderItem: ListRenderItem<Kalima> = useCallback(({ item, index }) => (
+    <KalimaCard 
+      item={item} 
+      isBookmarked={bookmarks.includes(item.id)}
+      onPress={() => setSelectedIndex(index)}
+      onYoutubePress={() => openYouTube(item.youtubeId)}
+    />
+  ), [bookmarks]);
+
   if (!fontsLoaded) {
     return (
       <View style={styles.loadingContainer}>
@@ -138,81 +207,48 @@ export default function ShahadahScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: "#F7FAF9" }}>
-      <StatusBar barStyle="light-content" />
+      {/* 5. TRANSLUCENT STATUS BAR for edge-to-edge effect */}
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
       
       {/* -------- HEADER -------- */}
-      <LinearGradient colors={['#0D5252', '#166B6B']} style={styles.headerContainer}>
-        {/* 🔙 Premium Back Button */}
-      <TouchableOpacity
-        onPress={() => router.back()}
-        activeOpacity={0.8}
+      <LinearGradient 
+        colors={['#0D5252', '#166B6B']} 
+        style={[styles.headerContainer, { paddingTop: insets.top + 10 }]} // Dynamic padding
       >
-          <Ionicons name="chevron-back" size={22} color={'#FFFFFF'} />
-
-      </TouchableOpacity>
-        <View>
+        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.8} style={styles.backBtn}>
+          <Ionicons name="chevron-back" size={24} color={'#FFFFFF'} />
+        </TouchableOpacity>
+        
+        <View style={{alignItems: 'center'}}>
           <Text style={styles.headerSubtitle}>Faith Essentials</Text>
           <Text style={styles.headerTitle}>The Six Kalimas</Text>
         </View>
+        
         <TouchableOpacity style={styles.headerIconBtn}>
            <Ionicons name="heart" size={22} color="#fff" />
         </TouchableOpacity>
       </LinearGradient>
 
-      {/* -------- LISTING PAGE -------- */}
-      <ScrollView 
-        style={styles.container}
-        contentContainerStyle={styles.scrollContent}
+      {/* -------- FLATLIST -------- */}
+      <FlatList
+        data={kalimas}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={renderItem}
+        // 6. BOTTOM SAFE AREA PADDING so last item isn't behind gesture bar
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 20 }]}
         showsVerticalScrollIndicator={false}
-      >
-        {kalimas.map((item, index) => (
-          <TouchableOpacity
-            key={item.id}
-            style={styles.card}
-            onPress={() => setSelectedIndex(index)}
-            activeOpacity={0.9}
-          >
-            <View style={styles.cardLeft}>
-              <LinearGradient colors={['#E8F5F1', '#C8E6E0']} style={styles.circle}>
-                <Text style={styles.num}>{item.id}</Text>
-              </LinearGradient>
-              <View style={styles.cardText}>
-                <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                    <Text style={styles.title}>{item.title}</Text>
-                    {bookmarks.includes(item.id) && (
-                        <Ionicons name="bookmark" size={12} color="#0D5252" style={{marginLeft: 6}} />
-                    )}
-                </View>
-                <Text style={styles.cardSubTitle}>{item.subtitle}</Text>
-              </View>
-            </View>
-
-            {/* ACTION BUTTONS ON LISTING PAGE */}
-            <View style={styles.actionRow}>
-                <TouchableOpacity 
-                    onPress={() => openYouTube(item.youtubeId)} 
-                    style={styles.listYoutubeBtn}
-                >
-                    <Ionicons name="logo-youtube" size={22} color="#FF0000" />
-                </TouchableOpacity>
-                <View style={styles.arrowCircle}>
-                    <Ionicons name="chevron-forward" size={16} color="#0D5252" />
-                </View>
-            </View>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      />
 
       {/* -------- DETAIL MODAL -------- */}
       <Modal 
         visible={selectedIndex !== null} 
         animationType="slide"
-        presentationStyle="fullScreen"
+        // 7. HANDLE MODAL STATUS BAR
+        presentationStyle={Platform.OS === 'ios' ? 'fullScreen' : 'overFullScreen'}
         onRequestClose={() => setSelectedIndex(null)}
+        statusBarTranslucent={true}
       >
         <View style={{ flex: 1, backgroundColor: '#F0F9F4' }}>
-          <StatusBar barStyle="light-content" backgroundColor="#0D5252" />
-          
           <PagerView 
             style={{ flex: 1 }} 
             initialPage={selectedIndex || 0}
@@ -220,23 +256,33 @@ export default function ShahadahScreen() {
           >
             {kalimas.map((item) => (
               <View key={item.id} style={{ flex: 1 }}>
-                <LinearGradient colors={['#0D5252', '#166B6B']} style={styles.detailHeader}>
+                
+                {/* MODAL HEADER */}
+                <LinearGradient 
+                  colors={['#0D5252', '#166B6B']} 
+                  style={[styles.detailHeader, { paddingTop: insets.top + 15 }]} // Dynamic modal header
+                >
                   <TouchableOpacity onPress={() => setSelectedIndex(null)} style={styles.headerIconBtn}>
                     <Ionicons name="close" size={24} color="#fff" />
                   </TouchableOpacity>
+                  
                   <Text style={styles.detailHeaderTitle}>{item.subtitle}</Text>
+                  
                   <TouchableOpacity onPress={() => toggleBookmark(item.id)} style={styles.headerIconBtn}>
                     <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
                       <Ionicons
                         name={bookmarks.includes(item.id) ? "bookmark" : "bookmark-outline"}
-                        size={22}
-                        color="#fff"
+                        size={22} color="#fff"
                       />
                     </Animated.View>
                   </TouchableOpacity>
                 </LinearGradient>
 
-                <ScrollView style={styles.detailContent} contentContainerStyle={styles.detailScrollContent}>
+                <ScrollView 
+                  style={styles.detailContent} 
+                  contentContainerStyle={[styles.detailScrollContent, { paddingBottom: insets.bottom + 40 }]}
+                  showsVerticalScrollIndicator={false}
+                >
                   <View style={styles.arabicCard}>
                     <Text style={styles.arabic}>{item.arabic}</Text>
                   </View>
@@ -257,9 +303,13 @@ export default function ShahadahScreen() {
                     <Text style={styles.meaningText}>{item.meaning}</Text>
                   </View>
 
+                  {/* Page Indicator */}
                   <View style={styles.pageIndicatorContainer}>
                     {kalimas.map((_, idx) => (
-                      <View key={idx} style={[styles.dot, idx === selectedIndex && styles.activeDot]} />
+                      <View 
+                        key={idx} 
+                        style={[styles.dot, idx === selectedIndex && styles.activeDot]} 
+                      />
                     ))}
                   </View>
                 </ScrollView>
@@ -276,61 +326,69 @@ export default function ShahadahScreen() {
 
 const styles = StyleSheet.create({
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F0F9F4' },
+  
   headerContainer: {
-    paddingTop: 75,
-    paddingBottom: 35,
-    paddingHorizontal: 25,
+    paddingBottom: 25,
+    paddingHorizontal: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderBottomLeftRadius: 35,
-    borderBottomRightRadius: 35,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    shadowColor: "#0D5252",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
     elevation: 10,
   },
-  headerTitle: { fontSize: 26, fontWeight: "800", color: "#fff" },
-  headerSubtitle: { fontSize: 13, color: "#A8D8D8", fontWeight: "600", textTransform: 'uppercase' },
-  headerIconBtn: { backgroundColor: 'rgba(255,255,255,0.15)', padding: 10, borderRadius: 15 },
+  backBtn: { padding: 5 },
+  headerTitle: { fontSize: 24, fontWeight: "800", color: "#fff", letterSpacing: 0.5 },
+  headerSubtitle: { fontSize: 12, color: "#A8D8D8", fontWeight: "700", textTransform: 'uppercase', marginBottom: 2 },
+  headerIconBtn: { backgroundColor: 'rgba(255,255,255,0.15)', padding: 10, borderRadius: 14 },
+  
   container: { flex: 1 },
   scrollContent: { padding: 20 },
+  
   card: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#fff",
-    borderRadius: 22,
-    padding: 18,
-    marginBottom: 16,
-    elevation: 4,
-    shadowColor: '#0D5252',
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.02)'
   },
   cardLeft: { flexDirection: "row", alignItems: "center", flex: 1 },
-  circle: { width: 50, height: 50, borderRadius: 16, justifyContent: "center", alignItems: "center", marginRight: 15 },
-  num: { fontWeight: "800", fontSize: 18, color: "#0D5252" },
+  circle: { width: 45, height: 45, borderRadius: 14, justifyContent: "center", alignItems: "center", marginRight: 14 },
+  num: { fontWeight: "800", fontSize: 16, color: "#0D5252" },
   cardText: { flex: 1 },
-  title: { fontSize: 17, fontWeight: "700", color: "#1A1A1A" },
-  cardSubTitle: { fontSize: 13, color: "#7A7A7A", marginTop: 2 },
+  title: { fontSize: 16, fontWeight: "700", color: "#1A1A1A" },
+  cardSubTitle: { fontSize: 12, color: "#7A7A7A", marginTop: 2, fontWeight: '500' },
   
-  // NEW LIST ACTION ROW
   actionRow: { flexDirection: 'row', alignItems: 'center' },
   listYoutubeBtn: {
-    padding: 10,
+    padding: 8,
     backgroundColor: '#FFF0F0',
-    borderRadius: 12,
-    marginRight: 10,
+    borderRadius: 10,
+    marginRight: 8,
     borderWidth: 1,
     borderColor: '#FFE0E0'
   },
   arrowCircle: { 
-    backgroundColor: "#F0F9F4", 
-    padding: 8, 
-    borderRadius: 10,
+    backgroundColor: "#F7FAF9", 
+    padding: 6, 
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#E8F5F1'
   },
   
   detailHeader: {
-    paddingTop: 50,
     paddingBottom: 20,
     paddingHorizontal: 20,
     flexDirection: "row",
@@ -338,39 +396,48 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
+    elevation: 5,
   },
   detailHeaderTitle: { fontSize: 18, fontWeight: "700", color: "#fff" },
   detailContent: { flex: 1 },
-  detailScrollContent: { padding: 25 },
+  detailScrollContent: { padding: 20 },
+  
   arabicCard: {
     backgroundColor: "#fff",
-    borderRadius: 25,
-    padding: 25,
+    borderRadius: 24,
+    padding: 24,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#E8F5F1'
+    borderColor: '#E8F5F1',
+    shadowColor: '#0D5252',
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
   },
   arabic: {
-    fontFamily: 'Traditional-Naskh',
-    fontSize: 32,
+    fontFamily: 'IndoPakQuran', 
+    fontWeight: 'normal',      
+    includeFontPadding: false, // CRITICAL FOR ANDROID
+    fontSize: 30,
     textAlign: "center",
     color: "#0D5252",
-    lineHeight: 60,
+    lineHeight: 55,
+    paddingVertical: 10 // Extra breathing room for diacritics
   },
   glassSection: {
-    backgroundColor: "rgba(255, 255, 255, 0.8)",
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 15,
+    backgroundColor: "rgba(255, 255, 255, 0.7)",
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 14,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.5)",
+    borderColor: "rgba(13, 82, 82, 0.05)",
   },
-  sectionLabel: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  sectionLabel: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   sectionLabelText: { fontSize: 11, fontWeight: '800', color: '#0D5252', marginLeft: 8, letterSpacing: 1 },
-  translitText: { fontSize: 16, color: "#444", fontStyle: "italic", lineHeight: 24 },
-  meaningText: { fontSize: 16, color: "#222", fontWeight: "500", lineHeight: 24 },
-  pageIndicatorContainer: { flexDirection: 'row', justifyContent: 'center', marginTop: 10, marginBottom: 30 },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#C8E6E0', marginHorizontal: 4 },
-  activeDot: { width: 22, backgroundColor: '#0D5252' },
-
+  translitText: { fontSize: 15, color: "#444", fontStyle: "italic", lineHeight: 22 },
+  meaningText: { fontSize: 15, color: "#222", fontWeight: "500", lineHeight: 22 },
+  
+  pageIndicatorContainer: { flexDirection: 'row', justifyContent: 'center', marginTop: 10, marginBottom: 10 },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#C8E6E0', marginHorizontal: 4 },
+  activeDot: { width: 20, backgroundColor: '#0D5252' },
 });
