@@ -22,33 +22,33 @@ const { width: W } = Dimensions.get("window");
 const rs = (n: number) => Math.round((n / 390) * W);
 
 /* ─────────────────────────────────────────
-   DESIGN TOKENS
-   Core: #0A4A4A deep jewel teal
-   Complements: warm gold, soft coral, bright aqua
+   DESIGN TOKENS — Refined dark jewel palette
 ───────────────────────────────────────── */
 const C = {
-  bg:        "#0A4A4A",   // deep emerald black
-  panel:     "#0B2E30",
-  card:      "#0F3B3D",
-  cardDeep:  "#051315",
-  beige:    "#E9E2D0",
-  beigeSoft:"#F3ECDA",
-  ink:       "#F6F3E8",
-  inkMid:    "#BFD6D1",
-  inkDim:    "#6FA39C",
-  inkFaint: "rgba(240,250,247,0.25)",
-  gold:      "#3ED6C8",
-  goldSoft:  "#9AF1E8",
-  goldGlow:  "rgba(62,214,200,0.15)",
-  aqua:     "#2F7A74",
-  aquaLt:   "#5F9F98",
-  mint:      "#4BB8A9",
-  goldLt:   "#F3ECDA",     
-  coral:    "#5F9F98",     
-  // Glow system
-  accentGlow: "rgba(47,122,116,0.06)",
-  // Shadow
-  shadow:   "#020F0F",
+  bg:         "#060E0E",
+  bgRich:     "#081212",
+  panel:      "#0B1A1A",
+  card:       "#0D2020",
+  cardLt:     "#102828",
+  cardDeep:   "#040C0C",
+  beige:      "#E8DFC8",
+  beigeSoft:  "#F2EBD8",
+  ink:        "#EDF5F3",
+  inkMid:     "#9AC4BC",
+  inkDim:     "#5A8880",
+  inkFaint:   "rgba(180,220,210,0.30)",
+  teal:       "#2FD9C8",
+  tealSoft:   "#6BE8DA",
+  tealGlow:   "rgba(47,217,200,0.18)",
+  tealDim:    "rgba(47,217,200,0.10)",
+  gold:       "#E8B84B",
+  goldSoft:   "#F5D47E",
+  goldGlow:   "rgba(232,184,75,0.15)",
+  coral:      "#E07265",
+  coralSoft:  "#F5A090",
+  coralGlow:  "rgba(224,114,101,0.15)",
+  aqua:       "#1A9E94",
+  shadow:     "#010707",
 };
 
 /* ─────────────────────────────────────────
@@ -56,34 +56,37 @@ const C = {
 ───────────────────────────────────────── */
 const SECTION_THEME = {
   Deen: {
-    accent:     "#4DD6C8",
-    accentSoft: "#8EEAE0",
-    accentDim:  "rgba(62,214,200,0.13)",
-    accentGlow: "rgba(62,214,200,0.06)",
-    gradA:      "#0D5C58",
-    gradB:      "#072C28",
-    iconBg:     "rgba(62,214,200,0.18)",
-    border:     "rgba(62,214,200,0.28)",
+    accent:     "#2FD9C8",
+    accentSoft: "#70EAE0",
+    accentDim:  "rgba(47,217,200,0.12)",
+    accentGlow: "rgba(47,217,200,0.05)",
+    gradA:      "#0D4E4A",
+    gradB:      "#071E1C",
+    iconBg:     "rgba(47,217,200,0.15)",
+    border:     "rgba(47,217,200,0.22)",
+    glowColor:  "rgba(47,217,200,0.06)",
   },
   Utility: {
-    accent:     "#4DD6C8",
-    accentSoft: "#8EEAE0",
-    accentDim:  "rgba(77,214,200,0.13)",
-    accentGlow: "rgba(77,214,200,0.06)",
-    gradA:      "#0D5C58",
-    gradB:      "#072C28",
-    iconBg:     "rgba(77,214,200,0.18)",
-    border:     "rgba(77,214,200,0.28)",
+    accent:     "#E8B84B",
+    accentSoft: "#F5D47E",
+    accentDim:  "rgba(232,184,75,0.12)",
+    accentGlow: "rgba(232,184,75,0.05)",
+    gradA:      "#3E2E08",
+    gradB:      "#1A1204",
+    iconBg:     "rgba(232,184,75,0.15)",
+    border:     "rgba(232,184,75,0.22)",
+    glowColor:  "rgba(232,184,75,0.06)",
   },
   Makkah: {
     accent:     "#E07265",
-    accentSoft: "#F0A095",
-    accentDim:  "rgba(224,114,101,0.13)",
-    accentGlow: "rgba(224,114,101,0.06)",
-    gradA:      "#0E5248",
-    gradB:      "#07282A",
-    iconBg:     "rgba(224,114,101,0.18)",
-    border:     "rgba(224,114,101,0.28)",
+    accentSoft: "#F5A090",
+    accentDim:  "rgba(224,114,101,0.12)",
+    accentGlow: "rgba(224,114,101,0.05)",
+    gradA:      "#3E1610",
+    gradB:      "#1A0A08",
+    iconBg:     "rgba(224,114,101,0.15)",
+    border:     "rgba(224,114,101,0.22)",
+    glowColor:  "rgba(224,114,101,0.06)",
   },
 } as const;
 
@@ -95,10 +98,11 @@ type ThemeType  = typeof SECTION_THEME[SectionKey];
 ───────────────────────────────────────── */
 type MCIconName = keyof typeof MaterialCommunityIcons.glyphMap;
 type FeatureItem = {
-  label: string;
-  icon:  MCIconName;
-  route: string;
+  label:    string;
+  icon:     MCIconName;
+  route:    string;
   featured?: boolean;
+  desc?:    string;
 };
 type FeatureSection = {
   title: string;
@@ -106,39 +110,39 @@ type FeatureSection = {
 };
 
 /* ─────────────────────────────────────────
-   DATA
+   DATA — with descriptions
 ───────────────────────────────────────── */
 const FEATURE_SECTIONS: FeatureSection[] = [
   {
     title: "Deen",
     items: [
-      { label: "Prayer Times", icon: "clock-outline",                  route: "/(tabs)/prayer",  featured: true },
-      { label: "Quran",        icon: "book-open-page-variant-outline", route: "/(tabs)/quran"  },
-      { label: "Tasbih",       icon: "gesture-tap",                    route: "/(tabs)/tasbeeh"},
-      { label: "Qibla",        icon: "compass-outline",                route: "/(tabs)/qibla"  },
-      { label: "Duas",         icon: "hand-heart-outline",             route: "./duas"          },
-      { label: "Khatam",       icon: "check-decagram-outline",         route: "./khatam"        },
-      { label: "Mosques",      icon: "mosque",                         route: "./mosque"        },
-      { label: "Memorize",     icon: "head-lightbulb-outline",         route: "./memorize"      },
-      { label: "Immerse",      icon: "headphones",                     route: "./Immerse"       },
-      { label: "Greetings",    icon: "email-open-outline",             route: "./greeting"      },
+      { label: "Prayer Times", icon: "clock-outline",                  route: "/(tabs)/prayer",  featured: true, desc: "Daily salah schedule" },
+      { label: "Quran",        icon: "book-open-page-variant-outline", route: "/(tabs)/quran",   desc: "Read & reflect" },
+      { label: "Tasbih",       icon: "gesture-tap",                    route: "/(tabs)/tasbeeh", desc: "Digital counter" },
+      { label: "Qibla",        icon: "compass-outline",                route: "/(tabs)/qibla",   desc: "Find direction" },
+      { label: "Duas",         icon: "hand-heart-outline",             route: "./duas",           desc: "Supplications" },
+      { label: "Khatam",       icon: "check-decagram-outline",         route: "./khatam",         desc: "Track completion" },
+      { label: "Mosques",      icon: "mosque",                         route: "./mosque",         desc: "Find nearby" },
+      { label: "Memorize",     icon: "head-lightbulb-outline",         route: "./memorize",       desc: "Hifz helper" },
+      { label: "Immerse",      icon: "headphones",                     route: "./Immerse",        desc: "Deep listening" },
+      { label: "Greetings",    icon: "email-open-outline",             route: "./greeting",       desc: "Islamic phrases" },
     ],
   },
   {
     title: "Utility",
     items: [
-      { label: "Journal",  icon: "notebook-outline",            route: "./journal"  },
-      { label: "Tracker",  icon: "chart-bell-curve-cumulative", route: "./tracker"  },
-      { label: "Calendar", icon: "calendar-blank-outline",      route: "./calender" },
-      { label: "Zakat",    icon: "hand-coin-outline",           route: "./zakat"    },
-      { label: "Shahadah", icon: "star-crescent",               route: "./kalima"   },
-      { label: "99 Names", icon: "star-four-points-outline",    route: "./names"    },
+      { label: "Journal",  icon: "notebook-outline",            route: "./journal",   desc: "Daily reflections" },
+      { label: "Tracker",  icon: "chart-bell-curve-cumulative", route: "./tracker",   desc: "Habit monitor" },
+      { label: "Calendar", icon: "calendar-blank-outline",      route: "./calender",  desc: "Hijri dates" },
+      { label: "Zakat",    icon: "hand-coin-outline",           route: "./zakat",     desc: "Calculate dues" },
+      { label: "Shahadah", icon: "star-crescent",               route: "./kalima",    desc: "Core beliefs" },
+      { label: "99 Names", icon: "star-four-points-outline",    route: "./names",     desc: "Asma ul Husna" },
     ],
   },
   {
     title: "Makkah",
     items: [
-      { label: "Makkah Live", icon: "video-outline", route: "./makkah_live", featured: true },
+      { label: "Makkah Live", icon: "video-outline", route: "./makkah_live", featured: true, desc: "Live Kaaba stream" },
     ],
   },
 ];
@@ -146,37 +150,54 @@ const FEATURE_SECTIONS: FeatureSection[] = [
 /* ─────────────────────────────────────────
    LAYOUT
 ───────────────────────────────────────── */
-const PAD  = rs(18);
-const GAP  = rs(12);
-const HALF = (W - PAD * 2 - GAP) / 2;
+const PAD  = rs(16);
+const GAP  = rs(10);
+const COLS = 3;
+const TILE = (W - PAD * 2 - GAP * (COLS - 1)) / COLS;
 
 /* ─────────────────────────────────────────
-   SPRING HELPER
+   SPRING
 ───────────────────────────────────────── */
-const spring = (v: Animated.Value, to: number, speed = 40, bounce = 4) =>
+const spring = (v: Animated.Value, to: number, speed = 40, bounce = 5) =>
   Animated.spring(v, { toValue: to, useNativeDriver: true, speed, bounciness: bounce });
 
 /* ─────────────────────────────────────────
-   STAR ORNAMENT — two rotated squares
+   GEOMETRIC ORNAMENT — Islamic star pattern
 ───────────────────────────────────────── */
-const StarOrnament: React.FC<{ color: string; size?: number }> = ({ color, size = rs(16) }) => (
-  <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
-    <View style={{
-      position: "absolute",
-      width: size * 0.58, height: size * 0.58,
-      borderWidth: 1.2, borderColor: color,
-    }} />
-    <View style={{
-      position: "absolute",
-      width: size * 0.58, height: size * 0.58,
-      borderWidth: 1.2, borderColor: color,
-      transform: [{ rotate: "45deg" }],
-    }} />
-  </View>
-);
+const IslamicStar: React.FC<{ color: string; size?: number; filled?: boolean }> = ({
+  color, size = rs(14), filled = false,
+}) => {
+  const s2 = size * 0.55;
+  return (
+    <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
+      <View style={{
+        position: "absolute",
+        width: s2, height: s2,
+        borderWidth: filled ? 0 : 1.2,
+        borderColor: color,
+        backgroundColor: filled ? color + "40" : "transparent",
+      }} />
+      <View style={{
+        position: "absolute",
+        width: s2, height: s2,
+        borderWidth: filled ? 0 : 1.2,
+        borderColor: color,
+        backgroundColor: filled ? color + "40" : "transparent",
+        transform: [{ rotate: "45deg" }],
+      }} />
+      {filled && (
+        <View style={{
+          width: s2 * 0.35, height: s2 * 0.35,
+          borderRadius: s2 * 0.2,
+          backgroundColor: color,
+        }} />
+      )}
+    </View>
+  );
+};
 
 /* ─────────────────────────────────────────
-   FEATURED CARD
+   FEATURED CARD — wide cinematic layout
 ───────────────────────────────────────── */
 const FeaturedCard: React.FC<{
   item:    FeatureItem;
@@ -184,54 +205,78 @@ const FeaturedCard: React.FC<{
   onPress: () => void;
 }> = ({ item, theme, onPress }) => {
   const scale = useRef(new Animated.Value(1)).current;
+  const glow  = useRef(new Animated.Value(0)).current;
+
+  const pressIn  = () => {
+    spring(scale, 0.968, 60, 0).start();
+    Animated.timing(glow, { toValue: 1, duration: 150, useNativeDriver: true }).start();
+  };
+  const pressOut = () => {
+    spring(scale, 1, 28, 8).start();
+    Animated.timing(glow, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+  };
+
   return (
-    <Animated.View style={[s.featWrap, { transform: [{ scale }] }]}>
+    <Animated.View style={[fs.wrap, { transform: [{ scale }] }]}>
       <TouchableOpacity
         activeOpacity={1}
         onPress={onPress}
-        onPressIn={() => spring(scale, 0.97, 50, 0).start()}
-        onPressOut={() => spring(scale, 1, 26, 7).start()}
-        style={s.featTouch}
+        onPressIn={pressIn}
+        onPressOut={pressOut}
+        style={fs.touch}
       >
-        {/* Layered gradient bg */}
+        {/* Deep gradient */}
         <LinearGradient
-          colors={[theme.gradA, theme.gradB, C.cardDeep]}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          colors={[theme.gradA + "EE", theme.gradA + "88", theme.gradB, C.cardDeep]}
+          start={{ x: 0.1, y: 0 }} end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFill}
         />
-        {/* Top shimmer */}
+        {/* Top shimmer line */}
         <LinearGradient
-          colors={[theme.accent + "00", theme.accent, theme.accentSoft, theme.accent + "00"]}
+          colors={["transparent", theme.accent + "BB", theme.accentSoft, theme.accent + "BB", "transparent"]}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-          style={s.featShimmer}
+          style={fs.shimmer}
         />
-        {/* Decorative concentric circles */}
-        <View style={[s.featRingLg, { borderColor: theme.accent + "10" }]} />
-        <View style={[s.featRingMd, { borderColor: theme.accent + "18" }]} />
-        {/* Glow blob behind orb */}
-        <View style={[s.featGlow, { backgroundColor: theme.accent + "16" }]} />
-        {/* Glass border overlay */}
-        <View style={[StyleSheet.absoluteFill, s.featBorderOverlay, { borderColor: theme.border }]} />
-        
-        <View style={s.featContent}>
-          {/* Left */}
-          <View style={s.featLeft}>
-            <View style={[s.featTag, { backgroundColor: theme.accentDim, borderColor: theme.border }]}>
-              <StarOrnament color={theme.accent} size={rs(9)} />
-              <Text style={[s.featTagTxt, { color: theme.accent }]}>FEATURED</Text>
+        {/* Radial glow blob */}
+        <Animated.View style={[fs.glowBlob, {
+          backgroundColor: theme.accent + "20",
+          opacity: glow.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }),
+        }]} />
+        {/* Concentric rings */}
+        <View style={[fs.ringOuter, { borderColor: theme.accent + "0E" }]} />
+        <View style={[fs.ringInner, { borderColor: theme.accent + "16" }]} />
+        {/* Glass border */}
+        <View style={[StyleSheet.absoluteFill, fs.border, { borderColor: theme.border }]} />
+
+        <View style={fs.content}>
+          {/* Left column */}
+          <View style={fs.left}>
+            <View style={[fs.badge, { backgroundColor: theme.accentDim, borderColor: theme.border }]}>
+              <IslamicStar color={theme.accent} size={rs(8)} filled />
+              <Text style={[fs.badgeTxt, { color: theme.accent }]}>FEATURED</Text>
             </View>
-            <Text style={s.featTitle}>{item.label}</Text>
-            <View style={[s.featCta, { borderColor: theme.border, backgroundColor: theme.accentDim }]}>
-              <Text style={[s.featCtaTxt, { color: theme.accentSoft }]}>Open now</Text>
-              <View style={[s.featCtaDot, { backgroundColor: theme.accent }]}>
-                <Feather name="arrow-right" size={rs(9)} color={C.cardDeep} />
+            <Text style={fs.title}>{item.label}</Text>
+            {item.desc && (
+              <Text style={[fs.desc, { color: theme.accentSoft + "BB" }]}>{item.desc}</Text>
+            )}
+            <TouchableOpacity
+              onPress={onPress}
+              style={[fs.cta, { borderColor: theme.border, backgroundColor: theme.accentDim }]}
+            >
+              <Text style={[fs.ctaTxt, { color: theme.accentSoft }]}>Open</Text>
+              <View style={[fs.ctaArrow, { backgroundColor: theme.accent }]}>
+                <Feather name="arrow-right" size={rs(10)} color={C.cardDeep} />
               </View>
-            </View>
+            </TouchableOpacity>
           </View>
+
           {/* Icon orb */}
-          <View style={[s.featOrbRing, { borderColor: theme.border }]}>
-            <View style={[s.featOrb, { backgroundColor: theme.iconBg }]}>
-              <MaterialCommunityIcons name={item.icon} size={rs(34)} color={theme.accent} />
+          <View style={fs.orbArea}>
+            <View style={[fs.orbRing2, { borderColor: theme.border + "80" }]} />
+            <View style={[fs.orbRing1, { borderColor: theme.border }]}>
+              <View style={[fs.orb, { backgroundColor: theme.iconBg }]}>
+                <MaterialCommunityIcons name={item.icon} size={rs(38)} color={theme.accent} />
+              </View>
             </View>
           </View>
         </View>
@@ -241,60 +286,63 @@ const FeaturedCard: React.FC<{
 };
 
 /* ─────────────────────────────────────────
-   STANDARD TILE
+   STANDARD TILE — 3-column grid
 ───────────────────────────────────────── */
-const FeatureCard: React.FC<{
+const FeatureTile: React.FC<{
   item:    FeatureItem;
-  isLeft:  boolean;
+  idx:     number;
   theme:   ThemeType;
   onPress: () => void;
-}> = ({ item, isLeft, theme, onPress }) => {
-  const scale   = useRef(new Animated.Value(1)).current;
-  const opacity = useRef(new Animated.Value(1)).current;
+}> = ({ item, idx, theme, onPress }) => {
+  const scale  = useRef(new Animated.Value(1)).current;
+  const bright = useRef(new Animated.Value(1)).current;
+  const col = idx % COLS;
+  const ml  = col > 0 ? GAP : 0;
+
   return (
-    <Animated.View style={[s.tileWrap, {
-      width: HALF, marginRight: isLeft ? GAP : 0,
-      transform: [{ scale }], opacity,
+    <Animated.View style={[ts.wrap, {
+      width: TILE,
+      marginLeft: ml,
+      transform: [{ scale }],
+      opacity: bright,
     }]}>
       <TouchableOpacity
         activeOpacity={1}
         onPress={onPress}
         onPressIn={() => {
-          spring(scale, 0.94, 60, 0).start();
-          Animated.timing(opacity, { toValue: 0.82, duration: 70, useNativeDriver: true }).start();
+          spring(scale, 0.92, 70, 0).start();
+          Animated.timing(bright, { toValue: 0.75, duration: 80, useNativeDriver: true }).start();
         }}
         onPressOut={() => {
-          spring(scale, 1, 26, 6).start();
-          Animated.timing(opacity, { toValue: 1, duration: 120, useNativeDriver: true }).start();
+          spring(scale, 1, 30, 7).start();
+          Animated.timing(bright, { toValue: 1, duration: 140, useNativeDriver: true }).start();
         }}
-        style={s.tile}
+        style={ts.card}
       >
-        {/* Subtle gradient wash */}
         <LinearGradient
-          colors={[theme.accentGlow, "transparent"]}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          colors={[theme.glowColor, "transparent"]}
+          start={{ x: 0.3, y: 0 }} end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFill}
         />
-        {/* Top accent notch */}
-        <View style={[s.tileNotch, { backgroundColor: theme.accent }]} />
+        {/* Accent notch */}
+        <View style={[ts.notch, { backgroundColor: theme.accent }]} />
         {/* Glass border */}
-        <View style={[StyleSheet.absoluteFill, s.tileBorder, { borderColor: theme.border }]} />
-        {/* Icon with glow ring */}
-        <View style={s.tileIconArea}>
-          <View style={[s.tileRing, { borderColor: theme.accent + "28" }]}>
-            <View style={[s.tileIconBg, { backgroundColor: theme.iconBg }]}>
-              <MaterialCommunityIcons name={item.icon} size={rs(22)} color={theme.accent} />
+        <View style={[StyleSheet.absoluteFill, ts.border, { borderColor: theme.border }]} />
+
+ {/* Icon — centered, larger */}
+        <View style={ts.iconWrap}>
+          <View style={[ts.iconRing, { borderColor: theme.accent + "30" }]}>
+            <View style={[ts.iconBg, { backgroundColor: theme.iconBg }]}>
+              <MaterialCommunityIcons name={item.icon} size={rs(30)} color={theme.accent} />
             </View>
           </View>
         </View>
-        {/* Label row */}
-        <View style={s.tileFooter}>
-          <Text style={s.tileLabel} numberOfLines={2}>{item.label}</Text>
-          <View style={[s.tileArrow, { borderColor: theme.border, backgroundColor: theme.accentDim }]}>
-            <Feather name="arrow-up-right" size={rs(9)} color={theme.accentSoft} />
-          </View>
-        </View>
+
+        {/* Label — centered, larger */}
+        <Text style={ts.label} numberOfLines={2}>{item.label}</Text>
       </TouchableOpacity>
+
+
     </Animated.View>
   );
 };
@@ -306,105 +354,177 @@ const SectionBlock: React.FC<{
   section: FeatureSection;
   onPress: (route: string) => void;
 }> = ({ section, onPress }) => {
-  const theme   = SECTION_THEME[section.title as SectionKey] ?? SECTION_THEME.Utility;
+  const theme    = SECTION_THEME[section.title as SectionKey] ?? SECTION_THEME.Utility;
   const featured = section.items.filter(i => i.featured);
   const standard = section.items.filter(i => !i.featured);
-  
+
+  const rows: FeatureItem[][] = [];
+  for (let i = 0; i < standard.length; i += COLS) {
+    rows.push(standard.slice(i, i + COLS));
+  }
+
   return (
-    <View style={s.sectionBlock}>
-      {/* Header row */}
-      <View style={s.secRow}>
-        <StarOrnament color={theme.accent} size={rs(13)} />
-        <Text style={[s.secTitle, { color: theme.accent }]}>{section.title.toUpperCase()}</Text>
-        <View style={[s.secRule, { backgroundColor: theme.accent + "28" }]} />
-        <View style={[s.secCount, { backgroundColor: theme.accentDim, borderColor: theme.border }]}>
-          <Text style={[s.secCountTxt, { color: theme.accentSoft }]}>{section.items.length}</Text>
+    <View style={sec.block}>
+      {/* Section header */}
+      <View style={sec.headerRow}>
+        <IslamicStar color={theme.accent} size={rs(12)} filled />
+        <Text style={[sec.title, { color: theme.accent }]}>{section.title.toUpperCase()}</Text>
+        <View style={[sec.rule, { backgroundColor: theme.accent + "25" }]} />
+        <View style={[sec.pill, { backgroundColor: theme.accentDim, borderColor: theme.border }]}>
+          <Text style={[sec.pillTxt, { color: theme.accentSoft }]}>{section.items.length}</Text>
         </View>
       </View>
-      
+
       {featured.map(item => (
         <FeaturedCard key={item.route} item={item} theme={theme} onPress={() => onPress(item.route)} />
       ))}
-      
-      {standard.length > 0 && (
-        <View style={s.grid}>
-          {standard.map((item, idx) => (
-            <FeatureCard
-              key={item.route} item={item}
-              isLeft={idx % 2 === 0} theme={theme}
+
+      {rows.map((row, ri) => (
+        <View key={ri} style={sec.row}>
+          {row.map((item, ci) => (
+            <FeatureTile
+              key={item.route}
+              item={item}
+              idx={ci}
+              theme={theme}
               onPress={() => onPress(item.route)}
             />
           ))}
         </View>
-      )}
+      ))}
     </View>
   );
 };
-
-/* ─────────────────────────────────────────
-   TOTAL COUNT
-───────────────────────────────────────── */
-const totalFeatures = FEATURE_SECTIONS.reduce((n, s) => n + s.items.length, 0);
 
 /* ─────────────────────────────────────────
    MAIN SCREEN
 ───────────────────────────────────────── */
 export default function IslamicFeaturesScreen() {
   const router = useRouter();
-  const [query, setQuery]             = useState("");
-  const [searchFocused, setFocused]   = useState(false);
-  
+  const [query, setQuery]           = useState("");
+  const [searchFocused, setFocused] = useState(false);
+  const scrollY = useRef(new Animated.Value(0)).current;
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return FEATURE_SECTIONS;
     return FEATURE_SECTIONS
-      .map(sec => ({ ...sec, items: sec.items.filter(i => i.label.toLowerCase().includes(q)) }))
-      .filter(sec => sec.items.length > 0);
+      .map(s => ({ ...s, items: s.items.filter(i => i.label.toLowerCase().includes(q)) }))
+      .filter(s => s.items.length > 0);
   }, [query]);
-  
+
   const navigate = (route: string) => router.push(route as any);
-  
+
+  const headerTranslate = scrollY.interpolate({
+    inputRange: [0, rs(100)],
+    outputRange: [0, -rs(12)],
+    extrapolate: "clamp",
+  });
+  const headerOpacity = scrollY.interpolate({
+    inputRange: [0, rs(80)],
+    outputRange: [1, 0.9],
+    extrapolate: "clamp",
+  });
+
   return (
-    <SafeAreaView style={s.root} edges={["top", "left", "right"]}>
-      {/* ════ HEADER ════ */}
-      <View style={s.header}>
-        {/* Rich gradient mesh */}
+    <SafeAreaView style={root.safe} edges={["top", "left", "right"]}>
+
+      {/* Background mesh */}
+      <View style={root.bgMesh}>
         <LinearGradient
-          colors={["#116058", "#0D5250", "#0A4A4A"]}
+          colors={["#0B2020", "#060E0E", "#040B0B"]}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFill}
         />
-        {/* Geometric rings - decorative */}
-        <View style={s.hRing1} />
-        <View style={s.hRing2} />
-        <View style={s.hRing3} />
+        <View style={root.blob1} />
+        <View style={root.blob2} />
+        <View style={root.blob3} />
+      </View>
 
-        {/* ── Nav row ── */}
-        <View style={s.navRow}>
-          <TouchableOpacity style={s.navBtn} onPress={() => router.back()}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-            <Feather name="chevron-left" size={rs(19)} color={C.beigeSoft} />
+      {/* ════ HEADER ════ */}
+      <Animated.View style={[root.header, {
+        transform: [{ translateY: headerTranslate }],
+        opacity: headerOpacity,
+      }]}>
+        <LinearGradient
+          colors={["#0E3030", "#0A2424", "#081A1A"]}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <View style={root.hRing1} />
+        <View style={root.hRing2} />
+        <LinearGradient
+          colors={["transparent", C.teal + "14", "transparent"]}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+          style={root.hShimmer}
+        />
+
+        {/* Nav row */}
+        <View style={root.navRow}>
+          <TouchableOpacity
+            style={root.backBtn}
+            onPress={() => router.back()}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <LinearGradient
+              colors={[C.tealDim + "CC", C.tealDim]}
+              style={[StyleSheet.absoluteFill, { borderRadius: rs(14) }]}
+            />
+            <View style={[StyleSheet.absoluteFill, root.backBorder]} />
+            <Feather name="chevron-left" size={rs(18)} color={C.tealSoft} />
           </TouchableOpacity>
-          
-          <View style={s.navCenter}>
-            <Text style={s.navTitle}>Features</Text>
+
+          <View style={root.titleGroup}>
+            <IslamicStar color={C.gold + "80"} size={rs(11)} />
+            <Text style={root.navTitle}>Features</Text>
+            <IslamicStar color={C.gold + "80"} size={rs(11)} />
           </View>
-          
-          {/* Spacer to keep the "Features" title perfectly centered */}
-          <View style={{ width: rs(40) }} />
+
+          {/* Total count badge */}
+          <View style={root.countBadge}>
+            <LinearGradient
+              colors={[C.goldGlow + "CC", C.goldGlow]}
+              style={[StyleSheet.absoluteFill, { borderRadius: rs(12) }]}
+            />
+            <View style={[StyleSheet.absoluteFill, root.countBorder]} />
+            <Text style={root.countTxt}>
+              {FEATURE_SECTIONS.reduce((n, s) => n + s.items.length, 0)}
+            </Text>
+          </View>
         </View>
-        
-        {/* Subtitle with star ornaments */}
-        <View style={s.subtitleRow}>
-        </View>
-        
-        {/* Search */}
-        <View style={[s.search, searchFocused && { borderColor: "rgba(77,214,200,0.55)" }]}>
-          <Feather name="search" size={rs(15)} color={searchFocused ? C.aqua : C.inkDim} />
+
+        {/* Category pills */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={root.pillsRow}
+          style={{ marginBottom: rs(14) }}
+        >
+          {FEATURE_SECTIONS.map(s => {
+            const t = SECTION_THEME[s.title as SectionKey];
+            return (
+              <View key={s.title} style={[root.categoryPill, {
+                backgroundColor: t.accentDim,
+                borderColor: t.border,
+              }]}>
+                <View style={[root.pillDot, { backgroundColor: t.accent }]} />
+                <Text style={[root.pillTxt, { color: t.accentSoft }]}>{s.title}</Text>
+                <Text style={[root.pillCount, { color: t.accent }]}>{s.items.length}</Text>
+              </View>
+            );
+          })}
+        </ScrollView>
+
+        {/* Search bar */}
+        <View style={[root.search, searchFocused && {
+          borderColor: C.teal + "60",
+          backgroundColor: "#0A1E1E",
+        }]}>
+          <Feather name="search" size={rs(14)} color={searchFocused ? C.teal : C.inkDim} />
           <TextInput
             placeholder="Search features…"
             placeholderTextColor={C.inkFaint}
-            style={s.searchInput}
+            style={root.searchInput}
             value={query}
             onChangeText={setQuery}
             onFocus={() => setFocused(true)}
@@ -412,46 +532,51 @@ export default function IslamicFeaturesScreen() {
             returnKeyType="search"
             clearButtonMode="while-editing"
             underlineColorAndroid="transparent"
-            selectionColor={C.aqua}
+            selectionColor={C.teal}
           />
-          {query.length > 0 && (
+          {query.length > 0 && Platform.OS === "android" && (
             <TouchableOpacity onPress={() => setQuery("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <View style={s.searchX}>
-                <Feather name="x" size={rs(11)} color={C.inkMid} />
+              <View style={root.clearX}>
+                <Feather name="x" size={rs(10)} color={C.inkMid} />
               </View>
             </TouchableOpacity>
           )}
         </View>
-      </View>
-      
-      {/* Tricolor divider */}
+      </Animated.View>
+
+      {/* Tri-color divider */}
       <LinearGradient
-        colors={[C.gold + "88", C.aqua + "55", C.coral + "35", "transparent"]}
+        colors={[C.teal + "70", C.gold + "40", C.coral + "25", "transparent"]}
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-        style={s.divider}
+        style={{ height: rs(1.5) }}
       />
-      
+
       {/* ════ SCROLL ════ */}
-      <ScrollView
-        contentContainerStyle={s.scroll}
+      <Animated.ScrollView
+        contentContainerStyle={root.scroll}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true }
+        )}
+        scrollEventThrottle={16}
       >
         {filtered.length === 0 ? (
-          <View style={s.empty}>
-            <View style={s.emptyOrb}>
-              <StarOrnament color={C.aqua + "55"} size={rs(34)} />
+          <View style={root.empty}>
+            <View style={root.emptyOrb}>
+              <IslamicStar color={C.teal + "55"} size={rs(40)} />
             </View>
-            <Text style={s.emptyTitle}>Nothing found</Text>
-            <Text style={s.emptyHint}>No results for "{query}"</Text>
+            <Text style={root.emptyTitle}>Nothing found</Text>
+            <Text style={root.emptyHint}>No results for "{query}"</Text>
           </View>
         ) : (
-          filtered.map(sec => (
-            <SectionBlock key={sec.title} section={sec} onPress={navigate} />
+          filtered.map(s => (
+            <SectionBlock key={s.title} section={s} onPress={navigate} />
           ))
         )}
-        <View style={{ height: rs(60) }} />
-      </ScrollView>
+        <View style={{ height: rs(80) }} />
+      </Animated.ScrollView>
     </SafeAreaView>
   );
 }
@@ -459,102 +584,105 @@ export default function IslamicFeaturesScreen() {
 /* ─────────────────────────────────────────
    STYLES
 ───────────────────────────────────────── */
-const TILE_H = HALF * 0.84;
-const shadowTile = Platform.select({
-  ios:     { shadowColor: C.shadow, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.60, shadowRadius: 14 },
-  android: { elevation: 8 },
+const TILE_H = TILE * 1.08;
+
+const shadowMd = Platform.select({
+  ios:     { shadowColor: C.shadow, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.55, shadowRadius: 12 },
+  android: { elevation: 7 },
 });
-const shadowFeat = Platform.select({
-  ios:     { shadowColor: C.shadow, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.70, shadowRadius: 22 },
-  android: { elevation: 14 },
+const shadowLg = Platform.select({
+  ios:     { shadowColor: C.shadow, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.65, shadowRadius: 20 },
+  android: { elevation: 13 },
 });
 
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg },
-  
-  /* ── Header ── */
+const root = StyleSheet.create({
+  safe:    { flex: 1, backgroundColor: C.bg },
+  bgMesh:  { ...StyleSheet.absoluteFillObject },
+  blob1: {
+    position: "absolute", top: -rs(60), left: -rs(60),
+    width: rs(280), height: rs(280), borderRadius: rs(140),
+    backgroundColor: "rgba(47,217,200,0.04)",
+  },
+  blob2: {
+    position: "absolute", top: rs(300), right: -rs(80),
+    width: rs(220), height: rs(220), borderRadius: rs(110),
+    backgroundColor: "rgba(232,184,75,0.03)",
+  },
+  blob3: {
+    position: "absolute", bottom: rs(100), left: -rs(40),
+    width: rs(180), height: rs(180), borderRadius: rs(90),
+    backgroundColor: "rgba(224,114,101,0.03)",
+  },
   header: {
     paddingHorizontal: PAD,
-    paddingBottom:     rs(20),
-    overflow:          "hidden",
+    paddingBottom: rs(18),
+    overflow: "hidden",
   },
-  
-  /* Decorative concentric rings in header */
   hRing1: {
-    position: "absolute", top: -rs(80), right: -rs(80),
-    width: rs(240), height: rs(240), borderRadius: rs(120),
-    borderWidth: 1, borderColor: "rgba(77,214,200,0.08)",
+    position: "absolute", top: -rs(70), right: -rs(70),
+    width: rs(220), height: rs(220), borderRadius: rs(110),
+    borderWidth: 1, borderColor: "rgba(47,217,200,0.07)",
   },
   hRing2: {
-    position: "absolute", top: -rs(50), right: -rs(50),
-    width: rs(160), height: rs(160), borderRadius: rs(80),
-    borderWidth: 1, borderColor: "rgba(232,184,75,0.10)",
+    position: "absolute", top: -rs(35), right: -rs(35),
+    width: rs(120), height: rs(120), borderRadius: rs(60),
+    borderWidth: 1, borderColor: "rgba(232,184,75,0.09)",
   },
-  hRing3: {
-    position: "absolute", top: -rs(25), right: -rs(25),
-    width: rs(90), height: rs(90), borderRadius: rs(45),
-    borderWidth: 1, borderColor: "rgba(224,114,101,0.12)",
+  hShimmer: {
+    position: "absolute", bottom: 0, left: 0, right: 0, height: rs(1),
   },
-
-  /* Nav */
   navRow: {
     flexDirection: "row", alignItems: "center",
     justifyContent: "space-between",
-    marginTop: rs(6), marginBottom: rs(14),
+    marginTop: rs(8), marginBottom: rs(16),
   },
-  navBtn: {
-    width: rs(40), height: rs(40), borderRadius: rs(13),
-    backgroundColor: "rgba(77,214,200,0.10)",
-    borderWidth: 1, borderColor: "rgba(77,214,200,0.22)",
+  backBtn: {
+    width: rs(42), height: rs(42), borderRadius: rs(14),
     alignItems: "center", justifyContent: "center",
+    overflow: "hidden",
   },
-  navCenter: {
+  backBorder: {
+    borderRadius: rs(14), borderWidth: 1,
+    borderColor: "rgba(47,217,200,0.22)",
+  },
+  titleGroup: {
     flexDirection: "row", alignItems: "center", gap: rs(10),
   },
   navTitle: {
-    fontSize: rs(32), // Increased text size
-    fontWeight: "800",
-    color: C.ink, letterSpacing: -0.6,
+    fontSize: rs(28), fontWeight: "800",
+    color: C.ink, letterSpacing: -0.5,
   },
-  navBadge: {
-    backgroundColor: "rgba(232,184,75,0.15)",
-    borderRadius: rs(10), borderWidth: 1.5,
-    borderColor: "rgba(232,184,75,0.38)",
-    paddingHorizontal: rs(9), paddingVertical: rs(3),
+  countBadge: {
+    width: rs(42), height: rs(42), borderRadius: rs(12),
+    alignItems: "center", justifyContent: "center",
+    overflow: "hidden",
   },
-  navBadgeTxt: {
-    fontSize: rs(12), fontWeight: "900", color: C.gold,
+  countBorder: {
+    borderRadius: rs(12), borderWidth: 1.5,
+    borderColor: "rgba(232,184,75,0.30)",
   },
-  
-  /* Subtitle */
-  subtitleRow: {
+  countTxt: {
+    fontSize: rs(13), fontWeight: "900", color: C.gold,
+  },
+  pillsRow: {
+    paddingRight: PAD, gap: rs(8), flexDirection: "row",
+  },
+  categoryPill: {
     flexDirection: "row", alignItems: "center",
-    gap: rs(8), marginBottom: rs(16),
+    borderRadius: rs(30), borderWidth: 1,
+    paddingHorizontal: rs(12), paddingVertical: rs(6), gap: rs(6),
   },
-  subtitle: {
-    fontSize: rs(12), color: C.inkMid,
-    fontWeight: "500", letterSpacing: 0.5,
-  },
-  
-  /* Pills */
-  pillsRow: { flexDirection: "row", gap: rs(8), marginBottom: rs(16) },
-  pill: {
-    flexDirection: "row", alignItems: "center",
-    borderRadius: rs(20), borderWidth: 1,
-    paddingHorizontal: rs(10), paddingVertical: rs(5), gap: rs(5),
-  },
-  pillDot: { width: rs(5), height: rs(5), borderRadius: rs(3) },
-  pillTxt: { fontSize: rs(11), fontWeight: "700", letterSpacing: 0.2 },
-  
-  /* Search */
+  pillDot:   { width: rs(6), height: rs(6), borderRadius: rs(3) },
+  pillTxt:   { fontSize: rs(11), fontWeight: "700", letterSpacing: 0.3 },
+  pillCount: { fontSize: rs(10), fontWeight: "900", marginLeft: rs(2) },
   search: {
     flexDirection: "row", alignItems: "center",
-    backgroundColor: "rgba(7,40,40,0.75)",
-    borderWidth: 1.5, borderColor: "rgba(77,214,200,0.22)",
-    borderRadius: rs(16), paddingHorizontal: rs(14), height: rs(48),
+    backgroundColor: "#081616",
+    borderWidth: 1.5, borderColor: "rgba(47,217,200,0.18)",
+    borderRadius: rs(16), paddingHorizontal: rs(14), height: rs(46),
     ...Platform.select({
-      ios:     { shadowColor: C.shadow, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.55, shadowRadius: 10 },
-      android: { elevation: 6 },
+      ios:     { shadowColor: C.shadow, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.50, shadowRadius: 8 },
+      android: { elevation: 5 },
     }),
   },
   searchInput: {
@@ -564,145 +692,141 @@ const s = StyleSheet.create({
       android: { includeFontPadding: false, textAlignVertical: "center" as const },
     }),
   },
-  searchX: {
+  clearX: {
     width: rs(22), height: rs(22), borderRadius: rs(11),
-    backgroundColor: "rgba(77,214,200,0.15)",
+    backgroundColor: "rgba(47,217,200,0.12)",
     alignItems: "center", justifyContent: "center",
   },
-  
-  /* Divider */
-  divider: { height: rs(2.5) },
-  
-  /* Scroll */
-  scroll: { paddingHorizontal: PAD, paddingTop: rs(24) },
-  
-  /* ── Section ── */
-  sectionBlock: { marginBottom: rs(34) },
-  secRow: {
+  scroll: { paddingHorizontal: PAD, paddingTop: rs(20) },
+  empty: { alignItems: "center", paddingTop: rs(100), gap: rs(16) },
+  emptyOrb: {
+    width: rs(96), height: rs(96), borderRadius: rs(48),
+    backgroundColor: "rgba(47,217,200,0.07)",
+    borderWidth: 1, borderColor: "rgba(47,217,200,0.18)",
+    alignItems: "center", justifyContent: "center",
+  },
+  emptyTitle: {
+    fontSize: rs(20), fontWeight: "800", color: C.inkMid, letterSpacing: -0.2,
+  },
+  emptyHint: { fontSize: rs(13), color: C.inkDim, fontWeight: "500" },
+});
+
+const sec = StyleSheet.create({
+  block: { marginBottom: rs(30) },
+  headerRow: {
     flexDirection: "row", alignItems: "center",
     gap: rs(8), marginBottom: rs(14),
   },
-  secTitle: {
-    fontSize: rs(11), fontWeight: "900", letterSpacing: 2.5,
-  },
-  secRule: { flex: 1, height: 1.5, borderRadius: 1 },
-  secCount: {
+  title: { fontSize: rs(10), fontWeight: "900", letterSpacing: 2.8 },
+  rule:  { flex: 1, height: 1.2, borderRadius: 1 },
+  pill: {
     borderRadius: rs(8), borderWidth: 1,
     paddingHorizontal: rs(8), paddingVertical: rs(2),
   },
-  secCountTxt: { fontSize: rs(11), fontWeight: "900" },
-  
-  /* ── Featured card ── */
-  featWrap: {
-    marginBottom: rs(14), borderRadius: rs(24), ...shadowFeat,
+  pillTxt: { fontSize: rs(11), fontWeight: "900" },
+  row: {
+    flexDirection: "row",
+    marginBottom: rs(10),
+    alignItems: "stretch",
   },
-  featTouch: {
-    height: rs(132), borderRadius: rs(24), overflow: "hidden",
+});
+
+const fs = StyleSheet.create({
+  wrap:  { marginBottom: rs(14), borderRadius: rs(22), ...shadowLg },
+  touch: { height: rs(138), borderRadius: rs(22), overflow: "hidden" },
+  shimmer: {
+    position: "absolute", top: 0, left: 0, right: 0, height: rs(2),
   },
-  featShimmer: {
-    position: "absolute", top: 0, left: 0, right: 0, height: rs(2.5),
+  glowBlob: {
+    position: "absolute", top: rs(10), right: rs(16),
+    width: rs(100), height: rs(100), borderRadius: rs(50),
   },
-  featRingLg: {
-    position: "absolute", top: -rs(55), right: -rs(55),
-    width: rs(190), height: rs(190), borderRadius: rs(95), borderWidth: 1,
+  ringOuter: {
+    position: "absolute", top: -rs(60), right: -rs(60),
+    width: rs(200), height: rs(200), borderRadius: rs(100), borderWidth: 1,
   },
-  featRingMd: {
-    position: "absolute", top: -rs(28), right: -rs(28),
-    width: rs(110), height: rs(110), borderRadius: rs(55), borderWidth: 1,
+  ringInner: {
+    position: "absolute", top: -rs(30), right: -rs(30),
+    width: rs(120), height: rs(120), borderRadius: rs(60), borderWidth: 1,
   },
-  featGlow: {
-    position: "absolute", top: rs(12), right: rs(18),
-    width: rs(90), height: rs(90), borderRadius: rs(45),
-  },
-  featBorderOverlay: {
-    borderRadius: rs(24), borderWidth: 1,
-  },
-  featContent: {
+  border: { borderRadius: rs(22), borderWidth: 1 },
+  content: {
     flex: 1, flexDirection: "row", alignItems: "center",
-    paddingHorizontal: rs(22), paddingVertical: rs(18), gap: rs(14),
+    paddingHorizontal: rs(20), paddingVertical: rs(16), gap: rs(12),
   },
-  featLeft: { flex: 1, gap: rs(8) },
-  featTag: {
+  left: { flex: 1, gap: rs(7) },
+  badge: {
     flexDirection: "row", alignSelf: "flex-start", alignItems: "center",
     gap: rs(5), borderRadius: rs(8), borderWidth: 1,
     paddingHorizontal: rs(8), paddingVertical: rs(3),
   },
-  featTagTxt: { fontSize: rs(9), fontWeight: "900", letterSpacing: 1.5 },
-  featTitle: {
-    fontSize: rs(24), fontWeight: "800",
-    color: C.ink, letterSpacing: -0.4, lineHeight: rs(28),
+  badgeTxt: { fontSize: rs(8), fontWeight: "900", letterSpacing: 1.8 },
+  title: {
+    fontSize: rs(22), fontWeight: "800",
+    color: C.ink, letterSpacing: -0.3, lineHeight: rs(26),
   },
-  featCta: {
+  desc: { fontSize: rs(11), fontWeight: "500" },
+  cta: {
     flexDirection: "row", alignSelf: "flex-start", alignItems: "center",
-    gap: rs(8), borderRadius: rs(20), borderWidth: 1,
-    paddingLeft: rs(12), paddingRight: rs(5), paddingVertical: rs(5),
+    gap: rs(7), borderRadius: rs(20), borderWidth: 1,
+    paddingLeft: rs(12), paddingRight: rs(4), paddingVertical: rs(5),
+    marginTop: rs(2),
   },
-  featCtaTxt: { fontSize: rs(12), fontWeight: "700" },
-  featCtaDot: {
+  ctaTxt:   { fontSize: rs(11), fontWeight: "700" },
+  ctaArrow: {
     width: rs(22), height: rs(22), borderRadius: rs(11),
     alignItems: "center", justifyContent: "center",
   },
-  featOrbRing: {
-    width: rs(76), height: rs(76), borderRadius: rs(22),
-    borderWidth: 1, alignItems: "center", justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.03)",
+  orbArea: { alignItems: "center", justifyContent: "center" },
+  orbRing2: {
+    position: "absolute",
+    width: rs(88), height: rs(88), borderRadius: rs(22), borderWidth: 1,
   },
-  featOrb: {
-    width: rs(62), height: rs(62), borderRadius: rs(18),
-    alignItems: "center", justifyContent: "center",
-  },
-  
-  /* ── Standard tile ── */
-  grid: { flexDirection: "row", flexWrap: "wrap" },
-  tileWrap: {
-    height: TILE_H, marginBottom: GAP, ...shadowTile,
-  },
-  tile: {
-    flex: 1, backgroundColor: C.card,
-    borderRadius: rs(20), overflow: "hidden", padding: rs(14),
-  },
-  tileNotch: {
-    position: "absolute", top: 0, left: rs(18),
-    width: rs(28), height: rs(2.5), borderRadius: rs(1.5), opacity: 0.85,
-  },
-  tileBorder: {
-    borderRadius: rs(20), borderWidth: 1,
-  },
-  tileIconArea: {
-    flex: 1, alignItems: "flex-end", justifyContent: "flex-start", paddingTop: rs(4),
-  },
-  tileRing: {
-    width: rs(52), height: rs(52), borderRadius: rs(16), borderWidth: 1,
-    alignItems: "center", justifyContent: "center",
+  orbRing1: {
+    width: rs(76), height: rs(76), borderRadius: rs(20),
+    borderWidth: 1.5, alignItems: "center", justifyContent: "center",
     backgroundColor: "rgba(255,255,255,0.02)",
   },
-  tileIconBg: {
-    width: rs(42), height: rs(42), borderRadius: rs(13),
+  orb: {
+    width: rs(62), height: rs(62), borderRadius: rs(17),
     alignItems: "center", justifyContent: "center",
   },
-  tileFooter: {
-    flexDirection: "row", alignItems: "flex-end",
-    justifyContent: "space-between", marginTop: rs(6),
+});
+
+const ts = StyleSheet.create({
+  wrap: { height: TILE_H, ...shadowMd },
+  card: {
+    flex: 1, backgroundColor: C.card,
+    borderRadius: rs(18), overflow: "hidden", padding: rs(12),
   },
-  tileLabel: {
-    flex: 1, color: C.ink, fontSize: rs(13),
-    fontWeight: "700", lineHeight: rs(18), marginRight: rs(6),
+  notch: {
+    position: "absolute", top: 0, left: rs(14),
+    width: rs(24), height: rs(2.5), borderRadius: rs(2), opacity: 0.9,
   },
-  tileArrow: {
-    width: rs(24), height: rs(24), borderRadius: rs(8), borderWidth: 1,
+  border:   { borderRadius: rs(18), borderWidth: 1 },
+  iconWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: rs(10),
+  },
+  iconRing: {
+    width: rs(62), height: rs(62), borderRadius: rs(19), borderWidth: 1,
+    alignItems: "center", justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.018)",
+  },
+  iconBg: {
+    width: rs(50), height: rs(50), borderRadius: rs(15),
     alignItems: "center", justifyContent: "center",
   },
-  
-  /* ── Empty state ── */
-  empty: { alignItems: "center", paddingTop: rs(90), gap: rs(14) },
-  emptyOrb: {
-    width: rs(90), height: rs(90), borderRadius: rs(45),
-    backgroundColor: "rgba(77,214,200,0.08)",
-    borderWidth: 1, borderColor: "rgba(77,214,200,0.20)",
+  label: {
+    color: C.ink, fontSize: rs(13), fontWeight: "700",
+    lineHeight: rs(18),
+    letterSpacing: 0.1,
+    textAlign: "center",
+  },
+  arrow: {
+    alignSelf: "flex-end",
+    width: rs(22), height: rs(22), borderRadius: rs(7), borderWidth: 1,
     alignItems: "center", justifyContent: "center",
   },
-  emptyTitle: {
-    fontSize: rs(20), fontWeight: "800", color: C.inkMid, letterSpacing: -0.3,
-  },
-  emptyHint: { fontSize: rs(13), color: C.inkDim, fontWeight: "500" },
 });
