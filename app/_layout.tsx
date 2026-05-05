@@ -8,8 +8,11 @@ export default function RootLayout() {
       <Stack.Screen name="screens/onboarding" />
       <Stack.Screen name="screens/quran_list" />
       <Stack.Screen name="screens/quran_details" />
+      <Stack.Screen name="login" />
+      <Stack.Screen name="register" />
       <Stack.Screen name="(tabs)" />
     </Stack>
+
   );
 }
 

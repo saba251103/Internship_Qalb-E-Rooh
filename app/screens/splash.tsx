@@ -632,16 +632,16 @@ export default function SplashScreen() {
 
         {/* Tagline */}
         <Animated.View style={{ opacity: tagFade, transform: [{ translateY: tagSlide }], alignItems: 'center' }}>
-          <Text style={spl.tagline}>Your Sacred Ramadan Companion</Text>
+          <Text style={spl.tagline}>Your Sacred Islamic Companion</Text>
         </Animated.View>
       </View>
 
       {/* ── BOTTOM: blessing + loading dots ── */}
       <View style={[spl.bottom, { paddingBottom: insets.bottom + rvs(24) }]}>
-        {/* Ramadan blessing */}
+        {/* blessing */}
         <Animated.View style={[spl.blessingRow, { opacity: blessFade }]}>
           <Star8 size={rs(7)} color={T.gold} opacity={0.45} />
-          <Text style={spl.blessingText}>رَمَضَانَ الْمُبَارَكَ</Text>
+          <Text style={spl.blessingText}>وَمَن يَتَوَكَّلْ عَلَى اللَّهِ فَهُوَ حَسْبُهُ</Text>
           <Star8 size={rs(7)} color={T.gold} opacity={0.45} />
         </Animated.View>
 

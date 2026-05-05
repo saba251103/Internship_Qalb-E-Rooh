@@ -22,6 +22,7 @@ import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-nat
 import { SafeAreaView } from "react-native-safe-area-context";
 import { moderateScale, scale, verticalScale } from "react-native-size-matters";
 import { WebView } from "react-native-webview";
+import { fetchNearbyMosquesFromBackend } from '../services/mosqueService';
 
 const { width, height } = Dimensions.get("window");
 
@@ -92,19 +93,19 @@ const LoaderScreen = () => {
       <LinearGradient colors={[T.emeraldDeep, T.emerald, T.emeraldLight]} style={StyleSheet.absoluteFill} />
 
       {/* Decorative rings */}
-      <View style={[ls.ring, { width: 280, height: 280, borderColor: "rgba(200,169,110,0.08)" }]} />
-      <View style={[ls.ring, { width: 200, height: 200, borderColor: "rgba(200,169,110,0.14)" }]} />
-      <View style={[ls.ring, { width: 130, height: 130, borderColor: "rgba(200,169,110,0.22)" }]} />
+      <View style={[ls.ring, { width: moderateScale(280), height: moderateScale(280), borderColor: "rgba(200,169,110,0.08)" }]} />
+      <View style={[ls.ring, { width: moderateScale(200), height: moderateScale(200), borderColor: "rgba(200,169,110,0.14)" }]} />
+      <View style={[ls.ring, { width: moderateScale(130), height: moderateScale(130), borderColor: "rgba(200,169,110,0.22)" }]} />
 
       <Animated.View style={{ opacity: opacityAnim, alignItems: "center" }}>
         <Animated.View style={[ls.iconWrap, { transform: [{ scale: pulseAnim }] }]}>
-          <Animated.View style={{ transform: [{ rotate }], position: "absolute", width: 110, height: 110 }}>
+          <Animated.View style={{ transform: [{ rotate }], position: "absolute", width: moderateScale(110), height: moderateScale(110) }}>
             {[0, 45, 90, 135, 180, 225, 270, 315].map((deg, i) => (
               <View
                 key={i}
                 style={[
                   ls.ornamentDot,
-                  { transform: [{ rotate: `${deg}deg` }, { translateY: -50 }], opacity: i % 2 === 0 ? 0.9 : 0.4 },
+                  { transform: [{ rotate: `${deg}deg` }, { translateY: -moderateScale(50) }], opacity: i % 2 === 0 ? 0.9 : 0.4 },
                 ]}
               />
             ))}
@@ -224,7 +225,7 @@ export default function NearbyMosquesList() {
 
   const init = async () => {
     try {
-      // 1. Check Cache with Expiry strategy
+      // 1. Check Cache
       const cache = await AsyncStorage.getItem(CACHE_KEY);
       let shouldUseCache = false;
       if (cache) {
@@ -240,11 +241,14 @@ export default function NearbyMosquesList() {
       if (!coords) { setLoading(false); return; }
       setUserCoords(coords);
 
-      // 3. Fetch Fresh Data if Cache expired or empty
+      // 3. Fetch Fresh Data from NestJS if needed
       if (!shouldUseCache) {
-        const fresh = await fetchMosques(coords.latitude, coords.longitude);
-        if (fresh.length > 0) {
-          processAndCacheData(fresh);
+        const freshMosques = await fetchNearbyMosquesFromBackend(coords.latitude, coords.longitude);
+        
+        if (freshMosques.length > 0) {
+          setMosques(freshMosques);
+          // Cache the clean data
+          await AsyncStorage.setItem(CACHE_KEY, JSON.stringify({ data: freshMosques, timestamp: Date.now() }));
         } else if (mosques.length === 0) {
           setErrorMsg("No masjids found in this area.");
         }
@@ -263,31 +267,6 @@ export default function NearbyMosquesList() {
       return null;
     }
     return (await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })).coords;
-  };
-
-  const fetchMosques = async (lat: number, lng: number) => {
-    const delta = 0.05;
-    const query = `[out:json][timeout:10];(nwr["amenity"="place_of_worship"]["religion"="muslim"](${lat - delta},${lng - delta},${lat + delta},${lng + delta});nwr["building"="mosque"](${lat - delta},${lng - delta},${lat + delta},${lng + delta}););out center tags;`;
-    try {
-      const res = await fetchWithTimeout("https://overpass-api.de/api/interpreter", { method: "POST", body: query });
-      return (await (res as Response).json()).elements || [];
-    } catch {
-      return []; 
-    }
-  };
-
-  const processAndCacheData = async (fresh: any[]) => {
-    const unique: Record<string, any> = {};
-    fresh.forEach((m) => {
-      const lat = m.lat || m.center?.lat;
-      const lon = m.lon || m.center?.lon;
-      const name = m.tags?.name || m.tags?.["name:en"] || "Masjid";
-      if (lat && lon) unique[name + lat] = { ...m, lat, lon, name };
-    });
-    const arr = Object.values(unique);
-    setMosques(arr);
-    // Cache with timestamp
-    await AsyncStorage.setItem(CACHE_KEY, JSON.stringify({ data: arr, timestamp: Date.now() }));
   };
 
   // Fixed zero-coordinate bug

@@ -25,7 +25,7 @@ const QuranScreen = () => {
   };
 
   const handleBackPress = () => {
-    router.push('/(tabs)' as any);
+    router.back();
   };
 
   const thinBorder = 1 / PixelRatio.get();

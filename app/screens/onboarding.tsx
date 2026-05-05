@@ -96,105 +96,109 @@ const SLIDES: SlideData[] = [
     arabic: 'قلب روح',
     arabicSub: 'Qalb-E-Rooh',
     title: 'Welcome to the\nHeart & Soul',
-    subtitle: 'Ramadan Mubarak 🌙',
-    desc: 'Your complete Ramadan companion — connecting you to Allah through prayer, recitation, and reflection.',
+    subtitle: 'Begin Your Journey 🌙',
+    desc: 'Your complete Islamic companion — connecting you to Allah through prayer, recitation, and daily reflection.',
     features: [
       { icon: 'television-play',   label: 'Makkah Live' },
       { icon: 'book-open-variant', label: 'Holy Quran'  },
       { icon: 'location-enter',    label: 'Qibla'       },
-      { icon: 'calendar-star',     label: 'Hijri Calender'   },
+      { icon: 'calendar-star',     label: 'Hijri Calendar' },
     ],
     bgColors: [R.night1, R.night3, R.night2],
     accent: R.gold,
-    icon: 'star-crescent',
+    icon: 'star-four-points-outline',
   },
+
   {
     id: 1,
     arabic: 'الصلاة والذكر',
-    arabicSub: 'Prayer & Remembrance',
-    title: 'Pray, Remember,\nBe Present',
-    subtitle: 'Five Pillars · One App',
-    desc: 'Never miss a salah. Track all five daily prayers, find Qibla instantly, and count your tasbeeh with a serene counter.',
+    arabicSub: 'Prayer & Dhikr',
+    title: 'Pray, Remember,\nStay Connected',
+    subtitle: 'Your Daily Salah Companion',
+    desc: 'Stay consistent in your prayers. Track all five daily salah, find Qibla instantly, and engage in peaceful dhikr anytime.',
     features: [
       { icon: 'alarm',             label: 'Prayer Times'  },
       { icon: 'rotate-360',        label: 'Tasbeeh'       },
       { icon: 'map-marker-radius', label: 'Qibla Finder'  },
       { icon: 'check-decagram',    label: 'Namaz Tracker' },
     ],
-    bgColors: [R.night1, '#0B3829', '#082E20'], // Deep teal tint
+    bgColors: [R.night1, '#0B3829', '#082E20'],
     accent: R.tealLight,
     icon: 'alarm',
   },
+
   {
     id: 2,
     arabic: 'القرآن الكريم',
     arabicSub: 'Al-Quran Al-Kareem',
-    title: 'Recite, Memorize\n& Complete',
+    title: 'Recite, Learn\n& Reflect',
     subtitle: 'Words of Allah ﷻ',
-    desc: 'Read the full Quran, track your Khatam progress, memorise surahs step by step, and immerse in every sacred ayah.',
+    desc: 'Read the Holy Quran, track your progress, memorise surahs, and immerse yourself in the beauty of every ayah.',
     features: [
       { icon: 'book-open-page-variant', label: 'Full Quran' },
       { icon: 'brain',                  label: 'Memorize'   },
-      { icon: 'bookmark-check',         label: 'Khatam'     },
-      { icon: 'headphones',             label: 'Immerse'    },
+      { icon: 'bookmark-check',         label: 'Progress'   },
+      { icon: 'headphones',             label: 'Audio'      },
     ],
     bgColors: ['#062618', '#0A3622', '#072C1C'],
     accent: R.jade,
     icon: 'book-open-variant',
   },
+
   {
     id: 3,
     arabic: 'أسماء الله الحسنى',
     arabicSub: '99 Names of Allah',
-    title: 'Know Allah ﷻ\nDeeper',
-    subtitle: 'Spiritual Awakening',
-    desc: 'Explore 99 Beautiful Names of Allah, learn the Shahadah, and discover Islamic greetings and their profound meanings.',
+    title: 'Know Allah ﷻ\nMore Deeply',
+    subtitle: 'Strengthen Your Faith',
+    desc: 'Explore the 99 Beautiful Names of Allah, understand their meanings, and deepen your connection with Him.',
     features: [
       { icon: 'infinity',        label: '99 Names'  },
       { icon: 'hand-heart',      label: 'Shahadah'  },
       { icon: 'chat-processing', label: 'Greetings' },
-      { icon: 'meditation',      label: 'Immerse'   },
+      { icon: 'meditation',      label: 'Reflection' },
     ],
-    bgColors: ['#05211A', '#09362B', '#072E24'], // Teal dominant
+    bgColors: ['#05211A', '#09362B', '#072E24'],
     accent: R.mint,
     icon: 'infinity',
   },
+
   {
     id: 4,
     arabic: 'التقويم والمسجد',
     arabicSub: 'Calendar & Mosque',
-    title: 'Navigate the\nSacred Calendar',
+    title: 'Stay Aligned with\nIslamic Time',
     subtitle: 'Always Connected',
-    desc: 'Follow the Hijri calendar, find nearby mosques for tarawih, watch Makkah Live, and journal your daily reflections.',
+    desc: 'Follow the Hijri calendar, find nearby mosques, stay updated with Islamic dates, and reflect on your daily journey.',
     features: [
-      { icon: 'calendar-moon',   label: 'Hijri Calender'   },
-      { icon: 'mosque',          label: 'Mosques'     },
-      { icon: 'television-play', label: 'Makkah Live' },
-      { icon: 'notebook-heart',  label: 'Journal'     },
+      { icon: 'calendar-moon',   label: 'Hijri Calendar' },
+      { icon: 'mosque',          label: 'Mosques Nearby' },
+      { icon: 'television-play', label: 'Makkah Live'    },
+      { icon: 'notebook-heart',  label: 'Journal'        },
     ],
     bgColors: ['#062618', '#0A3622', '#072C1C'],
     accent: R.jade,
     icon: 'calendar-star',
   },
+
   {
     id: 5,
-    arabic: 'رمضان مبارك',
-    arabicSub: 'Blessed Ramadan',
-    title: 'Zakat & Complete\nYour Deen',
-    subtitle: 'Begin Your Journey ✨',
-    desc: 'Calculate your Zakat with precision, fulfil the fourth pillar of Islam, and begin the most blessed journey of your life.',
+    arabic: 'رحلة الإيمان',
+    arabicSub: 'Journey of Faith',
+    title: 'Grow Spiritually\nEvery Day',
+    subtitle: 'A Lifelong Journey ✨',
+    desc: 'Strengthen your iman, build daily habits, and stay connected to your deen with tools designed for your spiritual growth.',
     features: [
-      { icon: 'hand-coin',    label: 'Zakat Calc'    },
-      { icon: 'book-heart',   label: 'Dua Journal'   },
-      { icon: 'star-shooting',label: 'Laylatul Qadr' },
-      { icon: 'heart-pulse',  label: 'Qalb-E-Rooh'  },
+      { icon: 'hand-coin',    label: 'Zakat Calculator' },
+      { icon: 'book-heart',   label: 'Dua Journal'      },
+      { icon: 'star-shooting',label: 'Daily Inspiration'},
+      { icon: 'heart-pulse',  label: 'Wellbeing'        },
     ],
-    bgColors: ['#05211A', '#09362B', '#072E24'], // Teal dominant
+    bgColors: ['#05211A', '#09362B', '#072E24'],
     accent: R.mint,
-    icon: 'hand-coin',
+    icon: 'heart-pulse',
   },
 ];
-
 /* ═══════════════════════════════════════════════════════════════
    STATIC PARTICLES
 ═══════════════════════════════════════════════════════════════ */
@@ -719,7 +723,7 @@ export default function QalbERoohOnboarding() {
   const isLast = idx === SLIDES.length - 1;
 
   const goNext = () => {
-    if (isLast) { router.replace('/(tabs)'); return; }
+    if (isLast) { router.replace('/login'); return; }
     setFromRight(false);
     setIdx(i => i + 1);
   };
@@ -728,7 +732,7 @@ export default function QalbERoohOnboarding() {
     setFromRight(true);
     setIdx(i => i - 1);
   };
-  const skip = () => router.replace('/(tabs)');
+  const skip = () => router.replace('/login');
 
   const onIn  = () => Animated.spring(btnScale, { toValue: 0.94, friction: 6, useNativeDriver: true }).start();
   const onOut = () => Animated.spring(btnScale, { toValue: 1,    friction: 5, useNativeDriver: true }).start();

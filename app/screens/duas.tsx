@@ -1,15 +1,29 @@
-import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+/**
+ * DuaScreen.tsx — Qalb-E-Rooh
+**/
+import { Feather, Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Clipboard from 'expo-clipboard';
 import { useFonts } from 'expo-font';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
   Animated,
+  BackHandler,
   Dimensions,
   FlatList,
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   Share,
@@ -21,202 +35,270 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import hisnData from '../../assets/data/hisnulmuslim.json';
+import { fetchSavedDuasFromBackend, syncDuaToggleWithBackend } from '../services/duaService';
 
-/* ─────────────────────────────────────────
-   RESPONSIVE SCALE (GLOBAL)
-───────────────────────────────────────── */
+// ─────────────────────────────────────────────
+// RESPONSIVE SCALE
+// ─────────────────────────────────────────────
 const { width: W } = Dimensions.get('window');
-// Clamp scale between 0.85 and 1.25 so large screens don't get bloated text
-const clampedScale = Math.min(Math.max(W / 390, 0.85), 1.25);
-const rs = (n: number) => Math.round(n * clampedScale);
+// FIX 14: Cap raised to 1.25 for larger phones/tablets
+const fontScale = Math.min(Math.max(W / 390, 0.9), 1.25);
+const rs = (n: number) => Math.round(n * fontScale);
 
-/* ─────────────────────────────────────────
-   DESIGN TOKENS
-───────────────────────────────────────── */
+// ─────────────────────────────────────────────
+// DESIGN TOKENS
+// ─────────────────────────────────────────────
 const C = {
-  bg0: '#061a19',
-  bg1: '#082220',
-  bg2: '#0c2e2b',
-  bg3: '#103836',
-  bg4: '#154542',
+  bg: '#041412',
+  surface: '#0A1E1C',
+  surfaceHighlight: '#0F2A27',
+  surfaceElevated: '#122420', // FIX: slight elevation variety
 
   mint: '#5bbfb0',
-  mintLight: '#7dd4c7',
-  mintBg: 'rgba(91,191,176,0.12)',
-  mintBorder: 'rgba(91,191,176,0.25)',
+  mintDim: 'rgba(91,191,176,0.12)',
+  mintGlow: 'rgba(91,191,176,0.3)',
 
-  cream: '#f0e8d5',
-  beige: '#cec5ad',
-  muted: '#7aada8',
-  dimmed: '#3d706b',
+  textHigh: '#F5F5F0',
+  textMed: '#A8BDBA',
+  // FIX 17: Raised from #627D79 → #7A9E9A (~4.6:1 contrast on dark bg — WCAG AA)
+  textLow: '#7A9E9A',
 
-  lavender: '#b8a9e8',
-  lavenderBg: 'rgba(184,169,232,0.12)',
+  border: 'rgba(91,191,176,0.08)',
+  divider: 'rgba(245,245,240,0.05)',
+  skeleton: 'rgba(91,191,176,0.06)',
 
-  border: 'rgba(255,255,255,0.06)',
-  borderMid: 'rgba(91,191,176,0.18)',
-
-  cardTints: [
-    'rgba(91,191,176,0.13)', 'rgba(157,200,180,0.13)', 'rgba(130,180,210,0.13)',
-    'rgba(170,210,165,0.13)', 'rgba(210,180,150,0.12)', 'rgba(160,190,220,0.13)',
-    'rgba(140,200,185,0.13)', 'rgba(180,200,170,0.13)', 'rgba(200,185,210,0.11)',
-    'rgba(175,210,195,0.13)',
-  ],
-  cardBorderTints: [
-    'rgba(91,191,176,0.22)', 'rgba(157,200,180,0.22)', 'rgba(130,180,210,0.22)',
-    'rgba(170,210,165,0.22)', 'rgba(210,180,150,0.20)', 'rgba(160,190,220,0.22)',
-    'rgba(140,200,185,0.22)', 'rgba(180,200,170,0.22)', 'rgba(200,185,210,0.20)',
-    'rgba(175,210,195,0.22)',
-  ],
+  toastBg: 'rgba(10,30,28,0.97)',
 };
 
-/* ─────────────────────────────────────────
-   TYPES
-───────────────────────────────────────── */
-interface HisnItem { title: string; reference: string; arabic: string; english: string; }
+// ─────────────────────────────────────────────
+// CONSTANTS
+// ─────────────────────────────────────────────
+const FLOATING_BAR_HEIGHT = rs(100); // FIX 11: known height for paddingBottom
+const STORAGE_KEY_SAVED = '@qalb_saved_duas';
 
-interface CategoryDef {
-  id: string; en: string; ar: string; emoji: string; colorIdx: number;
-}
-
+// ─────────────────────────────────────────────
+// TYPES
+// ─────────────────────────────────────────────
 interface DisplayDua {
-  id: string; groupId: string; originalTitle: string; arabic: string; translation: string; reference: string;
+  id: string;
+  groupId: string;
+  originalTitle: string;
+  arabic: string;
+  translation: string;
+  reference: string;
 }
 
-type ViewState = 'categories' | 'list' | 'detail';
+type ScreenState =
+  | { name: 'home' }
+  | { name: 'category'; categoryId: string; title: string }
+  | { name: 'detail'; dua: DisplayDua; categoryDuas: DisplayDua[] };
 
-/* ─────────────────────────────────────────
-   CATEGORY DEFINITIONS
-───────────────────────────────────────── */
-const CATEGORIES: CategoryDef[] = [
-  { id: 'Prayer',    en: 'Prayer & Worship',  ar: 'الوضوء و الصلاة',       emoji: '🕌', colorIdx: 0 },
-  { id: 'Praising',  en: 'Praising Allah',    ar: 'التسابيح و الأذكار',   emoji: '📿', colorIdx: 1 },
-  { id: 'Hajj',      en: 'Hajj & Umrah',      ar: 'الحج و العمرة',          emoji: '🕋', colorIdx: 2 },
-  { id: 'Travel',    en: 'Travel & Movement', ar: 'التنقل و السفر',        emoji: '✈️', colorIdx: 3 },
-  { id: 'Emotions',  en: 'Joy & Distress',    ar: 'الفرح و الخوف',          emoji: '🤲', colorIdx: 4 },
-  { id: 'Nature',    en: 'Nature & Weather',  ar: 'الطبيعة',                 emoji: '🌿', colorIdx: 5 },
-  { id: 'Etiquette', en: 'Etiquette',         ar: 'الآداب و التعامل',      emoji: '🌸', colorIdx: 6 },
-  { id: 'Home',      en: 'Home & Family',     ar: 'البيت و الأهل',          emoji: '🏡', colorIdx: 7 },
-  { id: 'Food',      en: 'Food & Drink',      ar: 'الطعام و الشراب',       emoji: '🍽️', colorIdx: 8 },
-  { id: 'Sickness',  en: 'Sickness & Death',  ar: 'المرض و الجنائز',      emoji: '🫀', colorIdx: 9 },
+// ─────────────────────────────────────────────
+// CATEGORIES
+// ─────────────────────────────────────────────
+const BASE_CATEGORIES = [
+  { id: 'Prayer',    en: 'Prayer & Wudu',  ar: 'الوضوء و الصلاة',   emoji: '🕌', keywords: ['prayer', 'wudu', 'ablution', 'mosque', 'athan', 'salah'] },
+  { id: 'Praising',  en: 'Dhikr',          ar: 'التسابيح و الأذكار', emoji: '📿', keywords: ['praise', 'glorification', 'remembrance', 'morning', 'evening'] },
+  { id: 'Hajj',      en: 'Hajj & Umrah',   ar: 'الحج و العمرة',      emoji: '🕋', keywords: ['hajj', 'umrah', 'talbiya', 'safa', 'marwa', 'arafat'] },
+  { id: 'Travel',    en: 'Travel',         ar: 'التنقل و السفر',    emoji: '✈️', keywords: ['travel', 'mounted', 'vehicle', 'returning', 'journey'] },
+  { id: 'Emotions',  en: 'Emotions',       ar: 'الفرح و الخوف',      emoji: '🤲', keywords: ['anxiety', 'sorrow', 'distress', 'angry', 'fear', 'hardship'] },
+  { id: 'Nature',    en: 'Nature',         ar: 'الطبيعة',             emoji: '🌿', keywords: ['rain', 'wind', 'thunder', 'moon', 'storm'] },
+  { id: 'Etiquette', en: 'Etiquette',      ar: 'الآداب',             emoji: '🌸', keywords: ['gathering', 'sneeze', 'greeting', 'guest', 'clothing'] },
+  { id: 'Home',      en: 'Home & Sleep',   ar: 'البيت و الأهل',      emoji: '🏡', keywords: ['home', 'house', 'sleep', 'marriage', 'waking'] },
+  { id: 'Food',      en: 'Food & Drink',   ar: 'الطعام و الشراب',   emoji: '🍽️', keywords: ['eating', 'food', 'drink', 'fast', 'iftar'] },
+  { id: 'Sickness',  en: 'Healing',        ar: 'المرض',             emoji: '🫀', keywords: ['sick', 'pain', 'death', 'grave', 'condolence'] },
 ];
 
-const getGroupId = (title: string): string => {
+const assignCategory = (title: string): string => {
   const t = title.toLowerCase();
-  if (t.includes('prayer') || t.includes('wudu') || t.includes('ablution') || t.includes('mosque') || t.includes('athan')) return 'Prayer';
-  if (t.includes('hajj') || t.includes('umrah') || t.includes('talbiya') || t.includes('safa')) return 'Hajj';
-  if (t.includes('travel') || t.includes('mounted') || t.includes('vehicle')) return 'Travel';
-  if (t.includes('anxiety') || t.includes('sorrow') || t.includes('distress') || t.includes('angry')) return 'Emotions';
-  if (t.includes('rain') || t.includes('wind') || t.includes('thunder') || t.includes('moon')) return 'Nature';
-  if (t.includes('gathering') || t.includes('sneeze') || t.includes('greeting')) return 'Etiquette';
-  if (t.includes('home') || t.includes('house') || t.includes('sleep') || t.includes('marriage')) return 'Home';
-  if (t.includes('eating') || t.includes('food') || t.includes('drink') || t.includes('fast')) return 'Food';
-  if (t.includes('sick') || t.includes('pain') || t.includes('death') || t.includes('grave')) return 'Sickness';
+  for (const cat of BASE_CATEGORIES) {
+    if (cat.keywords.some(kw => t.includes(kw))) return cat.id;
+  }
   return 'Praising';
 };
 
-/* ─────────────────────────────────────────
-   ANIMATED PRESS WRAPPER
-───────────────────────────────────────── */
-const PressScale: React.FC<{
-  onPress: () => void; style?: object; children: React.ReactNode; to?: number;
-}> = ({ onPress, style, children, to = 0.96 }) => {
+// ─────────────────────────────────────────────
+// PRESS SCALE WRAPPER
+// ─────────────────────────────────────────────
+const PressScale = ({ onPress, style, children, disabled }: any) => {
   const scale = useRef(new Animated.Value(1)).current;
-  const onIn = () => Animated.spring(scale, { toValue: to, useNativeDriver: true, speed: 40, bounciness: 0 }).start();
-  const onOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 25 }).start();
+  const animate = (to: number) =>
+    Animated.spring(scale, { toValue: to, useNativeDriver: true, speed: 40 }).start();
   return (
     <Animated.View style={[style, { transform: [{ scale }] }]}>
-      <TouchableOpacity activeOpacity={1} onPress={onPress} onPressIn={onIn} onPressOut={onOut}>
+      <TouchableOpacity
+        activeOpacity={1}
+        onPress={onPress}
+        onPressIn={() => animate(0.96)}
+        onPressOut={() => animate(1)}
+        disabled={disabled}
+      >
         {children}
       </TouchableOpacity>
     </Animated.View>
   );
 };
 
-/* ─────────────────────────────────────────
-   CATEGORY CARD
-───────────────────────────────────────── */
-const CategoryCard = React.memo(({
-  cat, count, onPress, cardWidth, cardHeight
-}: {
-  cat: CategoryDef; count: number; onPress: () => void; cardWidth: number; cardHeight: number;
-}) => (
-  <PressScale onPress={onPress} to={0.95}>
-    <View style={[
-      styles.catCard,
-      { width: cardWidth, height: cardHeight, backgroundColor: C.cardTints[cat.colorIdx], borderColor: C.cardBorderTints[cat.colorIdx] },
-    ]}>
-      <Text style={styles.catEmoji}>{cat.emoji}</Text>
-      <View style={styles.catTextBlock}>
-        <Text style={styles.catArabic} numberOfLines={3}>{cat.ar}</Text>
-        <Text style={styles.catEnglish} numberOfLines={1}>{cat.en}</Text>
+// ─────────────────────────────────────────────
+// SKELETON LOADER for Arabic text
+// ─────────────────────────────────────────────
+const ArabicSkeleton = () => {
+  const opacity = useRef(new Animated.Value(0.4)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 1, duration: 800, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.4, duration: 800, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+  return (
+    <Animated.View style={{ opacity }}>
+      {[100, 85, 90, 70].map((w, i) => (
+        <View
+          key={i}
+          style={{
+            height: rs(20),
+            width: `${w}%`,
+            backgroundColor: C.skeleton,
+            borderRadius: rs(6),
+            marginBottom: rs(12),
+            alignSelf: 'flex-end',
+          }}
+        />
+      ))}
+    </Animated.View>
+  );
+};
+
+// ─────────────────────────────────────────────
+// HIGHLIGHTED TEXT (keyword match)
+// ─────────────────────────────────────────────
+const HighlightedText = React.memo(({
+  text, query, style, numberOfLines,
+}: { text: string; query: string; style: any; numberOfLines?: number }) => {
+  if (!query.trim()) {
+    return <Text style={style} numberOfLines={numberOfLines}>{text}</Text>;
+  }
+  const parts = text.split(new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'));
+  return (
+    <Text style={style} numberOfLines={numberOfLines}>
+      {parts.map((part, i) =>
+        part.toLowerCase() === query.toLowerCase()
+          ? <Text key={i} style={[style, styles.highlight]}>{part}</Text>
+          : part
+      )}
+    </Text>
+  );
+});
+
+// ─────────────────────────────────────────────
+// MEMOIZED DUA CARD
+// ─────────────────────────────────────────────
+interface DuaCardProps {
+  item: DisplayDua;
+  isSaved: boolean;
+  searchQuery: string;
+  onPress: (dua: DisplayDua) => void;
+  onToggleSave: (id: string) => void;
+}
+
+const DuaCard = React.memo(({ item, isSaved, searchQuery, onPress, onToggleSave }: DuaCardProps) => (
+  <PressScale onPress={() => onPress(item)}>
+    <View style={styles.listCard}>
+      <View style={styles.listCardContent}>
+        <HighlightedText
+          text={item.originalTitle}
+          query={searchQuery}
+          style={styles.listCardTitle}
+          numberOfLines={2}
+        />
+        <Text style={styles.listCardPreview} numberOfLines={1}>{item.arabic}</Text>
       </View>
-      <View style={styles.catCountBadge}>
-        <Text style={styles.catCount}>{count} duas</Text>
-      </View>
+      <TouchableOpacity
+        onPress={() => onToggleSave(item.id)}
+        style={styles.listCardAction}
+        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        accessibilityLabel={isSaved ? 'Remove from saved' : 'Save dua'}
+      >
+        <Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'} size={rs(22)} color={isSaved ? C.mint : C.textLow} />
+      </TouchableOpacity>
     </View>
   </PressScale>
 ));
 
-/* ─────────────────────────────────────────
-   DUA LIST CARD
-───────────────────────────────────────── */
-const DuaListCard = React.memo(({
-  item, isSaved, onPress, onSave,
-}: {
-  item: DisplayDua; isSaved: boolean; onPress: () => void; onSave: () => void;
-}) => (
-  <PressScale onPress={onPress} to={0.975} style={{ marginBottom: rs(10) }}>
-    <View style={styles.duaCard}>
-      <View style={styles.duaCardInner}>
-        <View style={styles.duaCardAccent} />
-        <View style={styles.duaCardText}>
-          <Text style={styles.duaCardTitle} numberOfLines={2}>{item.originalTitle}</Text>
-          <Text style={styles.duaCardPreview} numberOfLines={1}>{item.arabic}</Text>
-        </View>
-        <TouchableOpacity onPress={onSave} style={styles.duaSaveBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-          <Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'} size={rs(20)} color={isSaved ? C.lavender : C.dimmed} />
+// ─────────────────────────────────────────────
+// COPY ACTION SHEET
+// ─────────────────────────────────────────────
+interface CopySheetProps {
+  visible: boolean;
+  onClose: () => void;
+  onCopyArabic: () => void;
+  onCopyFull: () => void;
+}
+const CopyActionSheet = ({ visible, onClose, onCopyArabic, onCopyFull }: CopySheetProps) => (
+  <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <TouchableOpacity style={styles.sheetOverlay} activeOpacity={1} onPress={onClose}>
+      <View style={styles.sheetContainer}>
+        <View style={styles.sheetHandle} />
+        <Text style={styles.sheetTitle}>Copy Dua</Text>
+        <TouchableOpacity style={styles.sheetOption} onPress={onCopyArabic}>
+          <Feather name="type" size={rs(20)} color={C.mint} />
+          <Text style={styles.sheetOptionText}>Copy Arabic Text Only</Text>
+        </TouchableOpacity>
+        <View style={styles.sheetDivider} />
+        <TouchableOpacity style={styles.sheetOption} onPress={onCopyFull}>
+          <Feather name="copy" size={rs(20)} color={C.mint} />
+          <Text style={styles.sheetOptionText}>Copy Full Dua (Arabic + Translation)</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.sheetCancel} onPress={onClose}>
+          <Text style={styles.sheetCancelText}>Cancel</Text>
         </TouchableOpacity>
       </View>
-    </View>
-  </PressScale>
-));
+    </TouchableOpacity>
+  </Modal>
+);
 
-/* ─────────────────────────────────────────
-   MAIN COMPONENT
-───────────────────────────────────────── */
+// ─────────────────────────────────────────────
+// MAIN SCREEN
+// ─────────────────────────────────────────────
 export default function DuaScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  
-  // Responsive hook for dynamic grid calculations
   const { width } = useWindowDimensions();
-  const numColumns = width > 800 ? 4 : width > 500 ? 3 : 2;
-  const CARD_GAP = rs(12);
-  const paddingHorizontal = rs(20);
-  const availableWidth = width - (paddingHorizontal * 2) - (CARD_GAP * (numColumns - 1));
-  const CARD_W = Math.floor(availableWidth / numColumns);
-  const CARD_H = CARD_W * 1.05;
+
+  const numCols = width > 768 ? 3 : 2;
+  const isTablet = width > 768;
+
+  const [fontsLoaded] = useFonts({ IndoPakQuran: require('../../assets/fonts/IndoPakQuran.ttf') });
 
   const [allDuas, setAllDuas] = useState<DisplayDua[]>([]);
-  const [savedIds, setSavedIds] = useState<string[]>([]);
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [navStack, setNavStack] = useState<ScreenState[]>([{ name: 'home' }]);
+  const currentScreen = navStack[navStack.length - 1];
+
+  const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'categories' | 'saved'>('categories');
-  const [view, setView] = useState<ViewState>('categories');
-  const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
-  const [selectedDua, setSelectedDua] = useState<DisplayDua | null>(null);
-  const [fontsLoaded] = useFonts({
-    'IndoPakQuran': require('../../assets/fonts/IndoPakQuran.ttf'),
-  });
-  
+  const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [showSavedOnly, setShowSavedOnly] = useState(false);
+  const [copySheetDua, setCopySheetDua] = useState<DisplayDua | null>(null);
+
+  // Toast
+  const [toast, setToast] = useState({ visible: false, message: '', icon: '' });
+  const toastOpacity = useRef(new Animated.Value(0)).current;
+  const toastTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── INIT ──
   useEffect(() => {
     const init = async () => {
-      const processed: DisplayDua[] = (hisnData as HisnItem[]).map((item, i) => {
+      const processed: DisplayDua[] = (hisnData as any[]).map((item, i) => {
         const clean = item.title.replace('Chapter: ', '').trim();
         return {
           id: `dua-${i}`,
-          groupId: getGroupId(clean),
+          groupId: assignCategory(clean),
           originalTitle: clean,
           arabic: item.arabic.trim(),
           translation: item.english.trim(),
@@ -224,355 +306,813 @@ export default function DuaScreen() {
         };
       });
       setAllDuas(processed);
+
       try {
-        const stored = await AsyncStorage.getItem('@qalb_saved_duas');
-        if (stored) setSavedIds(JSON.parse(stored));
-      } catch {}
+        const stored = await AsyncStorage.getItem(STORAGE_KEY_SAVED);
+        const localSet = stored ? new Set<string>(JSON.parse(stored) as string[]) : new Set<string>();
+        setSavedIds(localSet);
+        const serverIds = await fetchSavedDuasFromBackend();
+        const mergedSet = new Set([...localSet, ...serverIds]);
+        setSavedIds(mergedSet);
+        await AsyncStorage.setItem(STORAGE_KEY_SAVED, JSON.stringify([...mergedSet]));
+      } catch (_) {
+        console.warn('Sync failed, utilizing local cache.');
+      }
     };
     init();
   }, []);
 
-  if (!fontsLoaded) {
-    return (
-      <View style={[styles.root, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={C.mint} />
-      </View>
-    );
-  }
+  // ── BACK HANDLER ──
+  useEffect(() => {
+    const backAction = () => {
+      if (navStack.length > 1) {
+        popScreen();
+        return true;
+      }
+      return false; // Let default back action happen
+    };
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+    return () => backHandler.remove();
+  }, [navStack]);
 
-  const categoryCounts = useMemo(() => {
-    const map: Record<string, number> = {};
-    CATEGORIES.forEach(c => { map[c.id] = 0; });
-    allDuas.forEach(d => { if (map[d.groupId] !== undefined) map[d.groupId]++; });
-    return map;
-  }, [allDuas]);
+  // ── SEARCH DEBOUNCE ──
+  useEffect(() => {
+    if (searchDebounce.current) clearTimeout(searchDebounce.current);
+    searchDebounce.current = setTimeout(() => {
+      setSearchQuery(searchInput);
+    }, 300);
+    return () => {
+      if (searchDebounce.current) clearTimeout(searchDebounce.current);
+    };
+  }, [searchInput]);
 
-  const listDuas = useMemo(() => {
+  // ── NAVIGATION ──
+  const pushScreen = useCallback((screen: ScreenState) => {
+    Keyboard.dismiss();
+    setNavStack(prev => [...prev, screen]);
+  }, []);
+
+  const popScreen = useCallback(() => {
+    Haptics.selectionAsync();
+    Keyboard.dismiss();
+    setNavStack(prev => (prev.length > 1 ? prev.slice(0, -1) : prev));
+  }, []);
+
+
+  // ── TOAST ──
+  const showToastMsg = useCallback((message: string, icon: string) => {
+    if (toastTimeout.current) clearTimeout(toastTimeout.current);
+    setToast({ visible: true, message, icon });
+    Animated.sequence([
+      Animated.timing(toastOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+      Animated.delay(1800),
+      Animated.timing(toastOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+    ]).start(() => {
+      setToast(prev => ({ ...prev, visible: false }));
+    });
+  }, [toastOpacity]);
+
+  // ── SAVE TOGGLE ──
+  const toggleSave = useCallback(async (id: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    let isNowSaved = false;
+    setSavedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) { next.delete(id); isNowSaved = false; }
+      else { next.add(id); isNowSaved = true; }
+      AsyncStorage.setItem(STORAGE_KEY_SAVED, JSON.stringify([...next])).catch(() => {});
+      return next;
+    });
+    showToastMsg(isNowSaved ? 'Saved to Collection' : 'Removed from Collection', isNowSaved ? 'bookmark' : 'bookmark-outline');
+    try { await syncDuaToggleWithBackend(id); } catch (_) {}
+  }, [showToastMsg]);
+
+  // ── COPY ──
+  const handleCopyArabic = useCallback(async (text: string) => {
+    await Clipboard.setStringAsync(text);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setCopySheetDua(null);
+    showToastMsg('Arabic text copied', 'copy');
+  }, [showToastMsg]);
+
+  const handleCopyFull = useCallback(async (dua: DisplayDua) => {
+    const full = `${dua.arabic}\n\n${dua.translation}\n— ${dua.reference}`;
+    await Clipboard.setStringAsync(full);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setCopySheetDua(null);
+    showToastMsg('Full dua copied', 'copy');
+  }, [showToastMsg]);
+
+  // ── DATA DERIVATION ──
+  const displayedDuas = useMemo(() => {
     let result = allDuas;
-    if (activeTab === 'saved') result = result.filter(d => savedIds.includes(d.id));
-    if (activeCategoryId) result = result.filter(d => d.groupId === activeCategoryId);
+    if (showSavedOnly) result = result.filter(d => savedIds.has(d.id));
+    if (currentScreen.name === 'category') result = result.filter(d => d.groupId === currentScreen.categoryId);
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(
-        d => d.originalTitle.toLowerCase().includes(q) || d.translation.toLowerCase().includes(q) || d.arabic.includes(searchQuery),
+        d => d.originalTitle.toLowerCase().includes(q) || d.translation.toLowerCase().includes(q)
       );
     }
     return result;
-  }, [allDuas, activeTab, activeCategoryId, savedIds, searchQuery]);
-
-  const openCategory = useCallback((id: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setActiveCategoryId(id);
-    setView('list');
-  }, []);
-
-  const openDua = useCallback((dua: DisplayDua) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setSelectedDua(dua);
-    setView('detail');
-  }, []);
-
-  const goBack = useCallback(() => {
-    Haptics.selectionAsync();
-    if (view === 'detail') {
-      setView('list');
-      setSelectedDua(null);
-    } else if (view === 'list') {
-      setView('categories');
-      setActiveCategoryId(null);
-      setSearchQuery('');
-    } else {
-      router.back();
+  }, [allDuas, showSavedOnly, currentScreen, searchQuery, savedIds]);
+  const sortedCategories = BASE_CATEGORIES;
+  // ── BREADCRUMB ──
+  const getBreadcrumb = (): string | null => {
+    if (currentScreen.name === 'home') return null;
+    if (currentScreen.name === 'category') return `All • ${currentScreen.title}`;
+    if (currentScreen.name === 'detail') {
+      const cat = BASE_CATEGORIES.find(c => c.id === currentScreen.dua.groupId);
+      return `${cat?.en ?? 'All'} • ${currentScreen.dua.originalTitle}`;
     }
-  }, [view, router]);
+    return null;
+  };
+  const pushCategory = useCallback((categoryId: string, title: string) => {
+    pushScreen({ name: 'category', categoryId, title });
+  }, [pushScreen]);
+  // ════════════════════════════════════════════
+  // DEFINITION: DUA CARD RENDERER 
+  // ════════════════════════════════════════════
+  const renderDuaCard = useCallback(({ item }: { item: DisplayDua }) => {
+    if (!item || !item.id) {
+      return null;
+    }
 
-  const toggleSave = useCallback(async (id: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setSavedIds(prev => {
-      const next = prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id];
-      AsyncStorage.setItem('@qalb_saved_duas', JSON.stringify(next)).catch(() => {});
-      return next;
-    });
-  }, []);
+    const categoryDuas = currentScreen.name === 'category'
+      ? displayedDuas
+      : allDuas.filter(d => d.groupId === item.groupId);
 
-  const handleShare = useCallback(async (dua: DisplayDua) => {
-    try {
-      await Share.share({ message: `${dua.arabic}\n\n${dua.translation}\n\n${dua.reference}\n\nShared via Qalb-E-Rooh` });
-    } catch {}
-  }, []);
+    return (
+      <DuaCard
+        item={item}
+        isSaved={savedIds.has(item.id)}
+        searchQuery={searchQuery}
+        onPress={(dua) => {
+          Haptics.selectionAsync();
+          pushScreen({ name: 'detail', dua, categoryDuas });
+        }}
+        onToggleSave={toggleSave}
+      />
+    );
+  }, [savedIds, searchQuery, pushScreen, toggleSave, displayedDuas, allDuas, currentScreen]);
 
-  const getHeaderTitle = () => {
-    if (view === 'detail' && selectedDua) return selectedDua.originalTitle;
-    if (view === 'list' && activeCategoryId) return CATEGORIES.find(c => c.id === activeCategoryId)?.en ?? 'Duas';
-    return 'Duas';
+  // ── FONT GUARD ──
+  if (!fontsLoaded && allDuas.length === 0) {
+    return (
+      <View style={[styles.root, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator color={C.mint} />
+      </View>
+    );
+  }
+
+  // ════════════════════════════════════════════
+  // RENDER: HEADER
+  // ════════════════════════════════════════════
+  const renderHeader = () => {
+    const isHome = currentScreen.name === 'home';
+    const breadcrumb = getBreadcrumb();
+
+    return (
+      <View style={[styles.header, { paddingTop: insets.top + rs(12) }]}>
+        <TouchableOpacity
+          onPress={() => {
+            if (isHome) {
+              router.back();
+            } else {
+              popScreen();
+            }
+          }}
+          style={styles.iconBtn}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          accessibilityLabel="Go back"
+        >
+          <Feather name="arrow-left" size={rs(24)} color={C.textHigh} />
+        </TouchableOpacity>
+
+        <View style={[styles.headerCenter, isHome && { alignItems: 'flex-start' }]}>
+          <Text
+            style={[styles.headerTitle, isHome && { fontSize: rs(20), textAlign: 'left' }]}
+            numberOfLines={1}
+          >
+            {isHome ? 'Qalb-E-Rooh' : currentScreen.name === 'category' ? currentScreen.title : currentScreen.dua.originalTitle}
+          </Text>
+          {breadcrumb ? (
+            <Text style={styles.breadcrumb} numberOfLines={1}>{breadcrumb}</Text>
+          ) : null}
+        </View>
+
+        <TouchableOpacity
+          onPress={() => { setShowSavedOnly(!showSavedOnly); Haptics.selectionAsync(); }}
+          style={[styles.savedChip, showSavedOnly && styles.savedChipActive]}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          accessibilityLabel={showSavedOnly ? 'Show all duas' : 'Show saved only'}
+        >
+          <Ionicons
+            name={showSavedOnly ? 'bookmark' : 'bookmark-outline'}
+            size={rs(16)}
+            color={showSavedOnly ? C.bg : C.textMed}
+          />
+          <Text style={[styles.savedChipText, showSavedOnly && styles.savedChipTextActive]}>
+            {showSavedOnly ? 'Saved' : 'All'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
   };
 
-  const renderHeader = () => (
-    <View style={[styles.header, { paddingTop: insets.top + rs(8) }]}>
-      <TouchableOpacity style={styles.headerBackBtn} onPress={goBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-        <Feather name="arrow-left" size={rs(22)} color={C.cream} />
-      </TouchableOpacity>
-      <Text style={styles.headerTitle} numberOfLines={1}>{getHeaderTitle()}</Text>
+  // ════════════════════════════════════════════
+  // RENDER: HOME / CATEGORY LIST
+  // ════════════════════════════════════════════
+  const renderEmptyState = () => (
+    <View style={styles.emptyContainer}>
+      <Feather name="search" size={rs(40)} color={C.textLow} style={{ marginBottom: rs(16) }} />
+      <Text style={styles.emptyTitle}>No duas found</Text>
+      <Text style={styles.emptySub}>Try adjusting your search or filters.</Text>
     </View>
   );
 
-  /* ─────────────────────────────────────
-     VIEW: DETAIL
-  ───────────────────────────────────── */
-  if (view === 'detail' && selectedDua) {
-    const isSaved = savedIds.includes(selectedDua.id);
-    const cat = CATEGORIES.find(c => c.id === selectedDua.groupId);
+  const renderHomeOrCategory = () => {
+    const isSearchingOrFiltering = searchQuery.trim() !== '' || showSavedOnly || currentScreen.name === 'category';
+    const ITEM_HEIGHT = rs(88);
 
     return (
-      <View style={styles.root}>
-        <LinearGradient colors={[C.bg0, C.bg1]} style={StyleSheet.absoluteFill} />
-        {renderHeader()}
+      <View style={{ flex: 1 }}>
+        {/* Search bar */}
+        <View style={styles.searchContainer}>
+          <Ionicons name="search" size={rs(18)} color={C.textLow} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search for peace, protection, healing..."
+            placeholderTextColor={C.textLow}
+            value={searchInput}
+            onChangeText={setSearchInput}
+            selectionColor={C.mint}
+            returnKeyType="done"
+            onSubmitEditing={Keyboard.dismiss}
+          />
+          {searchInput ? (
+            <TouchableOpacity
+              onPress={() => { setSearchInput(''); setSearchQuery(''); Keyboard.dismiss(); }}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
+              <Feather name="x-circle" size={rs(18)} color={C.textLow} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.detailScroll, { paddingBottom: insets.bottom + rs(50) }]}>
-          {cat && (
-            <View style={styles.detailCatChip}>
-              <Text style={styles.detailCatEmoji}>{cat.emoji}</Text>
-              <Text style={styles.detailCatLabel}>{cat.en}</Text>
+        {isSearchingOrFiltering && (
+          <View style={styles.contextBanner}>
+            <Text style={styles.contextText}>
+              {displayedDuas.length} result{displayedDuas.length !== 1 ? 's' : ''}{' '}
+              {currentScreen.name === 'category' ? `in ${currentScreen.title}` : 'in All Duas'}
+              {showSavedOnly ? ' (Saved Only)' : ''}
+            </Text>
+          </View>
+        )}
+
+        {isSearchingOrFiltering ? (
+          <FlatList
+            data={displayedDuas}
+            keyExtractor={d => d.id}
+            renderItem={renderDuaCard}
+            contentContainerStyle={[styles.scrollPad, { paddingBottom: insets.bottom + rs(40) }]}
+            keyboardDismissMode="on-drag"
+            keyboardShouldPersistTaps="handled"
+            ListEmptyComponent={renderEmptyState}
+            removeClippedSubviews={true}
+            initialNumToRender={12}
+            maxToRenderPerBatch={10}
+            windowSize={5}
+            getItemLayout={(_data, index) => ({
+              length: ITEM_HEIGHT + rs(12),
+              offset: (ITEM_HEIGHT + rs(12)) * index,
+              index,
+            })}
+          />
+        ) : (
+          <FlatList
+            key={`grid-${numCols}`}
+            data={sortedCategories}
+            numColumns={numCols}
+            columnWrapperStyle={{ gap: rs(12) }}
+            contentContainerStyle={[styles.scrollPad, { gap: rs(12), paddingBottom: insets.bottom + rs(40) }]}
+            keyExtractor={c => c.id}
+            keyboardDismissMode="on-drag"
+            removeClippedSubviews={true}
+            renderItem={({ item, index }) => {
+                return (
+                  <PressScale style={{ flex: 1 }} onPress={() => pushCategory(item.id, item.en)}>
+                    <View style={[styles.gridCard]}>
+                      <Text style={styles.gridEmoji}>{item.emoji}</Text>
+                      <Text style={styles.gridAr}>{item.ar}</Text>
+                      <Text style={styles.gridEn}>{item.en}</Text>
+                    </View>
+                  </PressScale>
+                );
+            }}
+          />
+        )}
+      </View>
+    );
+  };
+
+  // ════════════════════════════════════════════
+  // RENDER: DETAIL VIEW
+  // ════════════════════════════════════════════
+  const renderDetail = (dua: DisplayDua, categoryDuas: DisplayDua[]) => {
+    const isSaved = savedIds.has(dua.id);
+    const currentIdx = categoryDuas.findIndex(d => d.id === dua.id);
+    const hasPrev = currentIdx > 0;
+    const hasNext = currentIdx < categoryDuas.length - 1;
+
+    const goTo = (delta: number) => {
+      const target = categoryDuas[currentIdx + delta];
+      if (!target) return;
+      Haptics.selectionAsync();
+      setNavStack(prev => [
+        ...prev.slice(0, -1),
+        { name: 'detail', dua: target, categoryDuas },
+      ]);
+    };
+
+    return (
+      <View style={{ flex: 1 }}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardDismissMode="on-drag"
+          contentContainerStyle={[
+            styles.scrollPad,
+            { paddingBottom: FLOATING_BAR_HEIGHT + insets.bottom + rs(40) },
+          ]}
+        >
+          {categoryDuas.length > 1 && (
+            <View style={styles.duaNavRow}>
+              <TouchableOpacity
+                style={[styles.duaNavBtn, !hasPrev && styles.duaNavBtnDisabled]}
+                onPress={() => goTo(-1)}
+                disabled={!hasPrev}
+              >
+                <Feather name="chevron-left" size={rs(16)} color={hasPrev ? C.mint : C.textLow} />
+                <Text style={[styles.duaNavText, !hasPrev && { color: C.textLow }]}>Prev</Text>
+              </TouchableOpacity>
+              <Text style={styles.duaNavCount}>{currentIdx + 1} / {categoryDuas.length}</Text>
+              <TouchableOpacity
+                style={[styles.duaNavBtn, !hasNext && styles.duaNavBtnDisabled]}
+                onPress={() => goTo(1)}
+                disabled={!hasNext}
+              >
+                <Text style={[styles.duaNavText, !hasNext && { color: C.textLow }]}>Next</Text>
+                <Feather name="chevron-right" size={rs(16)} color={hasNext ? C.mint : C.textLow} />
+              </TouchableOpacity>
             </View>
           )}
 
-          {/* Fixed Arabic text container */}
-          <View style={styles.arabicCard}>
-            <View style={styles.arabicCornerTL} />
-            <View style={styles.arabicCornerBR} />
-            
-            <View style={{ maxHeight: rs(350) }}> 
-              <ScrollView nestedScrollEnabled showsVerticalScrollIndicator indicatorStyle="white" contentContainerStyle={{ paddingVertical: rs(15), paddingHorizontal: rs(10) }}>
-                <Text style={styles.arabicText}>
-                  {selectedDua.arabic}
-                </Text>
-              </ScrollView>
+          <View style={styles.detailHeader}>
+            <Text style={styles.detailTitle}>{dua.originalTitle}</Text>
+          </View>
+
+          <View style={styles.arabicContainer}>
+            {!fontsLoaded ? (
+              <ArabicSkeleton />
+            ) : (
+              <Text style={styles.arabicText}>{dua.arabic}</Text>
+            )}
+          </View>
+
+          <View style={styles.translationContainer}>
+            <Text style={styles.translationText}>{dua.translation}</Text>
+            <View style={styles.referenceBadge}>
+              <Feather name="book-open" size={rs(12)} color={C.mint} />
+              <Text style={styles.referenceText}>{dua.reference}</Text>
             </View>
-          </View>
-
-          <View style={styles.sectionDivider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerLabel}>Translation</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          <View style={styles.translationCard}>
-            <Text style={styles.translationText}>{selectedDua.translation}</Text>
-          </View>
-
-          <View style={styles.refRow}>
-            <Feather name="book-open" size={rs(12)} color={C.dimmed} />
-            <Text style={styles.refText}>{selectedDua.reference}</Text>
-          </View>
-
-          <View style={styles.actionRow}>
-            <PressScale onPress={() => handleShare(selectedDua)} style={styles.actionBtn} to={0.94}>
-              <Feather name="share-2" size={rs(17)} color={C.mint} />
-              <Text style={styles.actionText}>Share</Text>
-            </PressScale>
-            <View style={styles.actionDivider} />
-            <PressScale onPress={() => toggleSave(selectedDua.id)} style={styles.actionBtn} to={0.94}>
-              <Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'} size={rs(17)} color={isSaved ? C.lavender : C.mint} />
-              <Text style={[styles.actionText, isSaved && { color: C.lavender }]}>{isSaved ? 'Saved' : 'Save'}</Text>
-            </PressScale>
-            <View style={styles.actionDivider} />
-            <PressScale onPress={() => { Share.share({ message: selectedDua.arabic }); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); }} style={styles.actionBtn} to={0.94}>
-              <MaterialCommunityIcons name="content-copy" size={rs(17)} color={C.mint} />
-              <Text style={styles.actionText}>Copy</Text>
-            </PressScale>
           </View>
         </ScrollView>
-      </View>
-    );
-  }
 
-  /* ─────────────────────────────────────
-     VIEW: LIST (duas within a category / saved)
-  ───────────────────────────────────── */
-  if (view === 'list') {
-    return (
-      <View style={styles.root}>
-        <LinearGradient colors={[C.bg0, C.bg1]} style={StyleSheet.absoluteFill} />
-        {renderHeader()}
-
-        {activeCategoryId && (() => {
-          const cat = CATEGORIES.find(c => c.id === activeCategoryId)!;
-          return (
-            <View style={styles.listCatStrip}>
-              <Text style={styles.listCatEmoji}>{cat.emoji}</Text>
-              <View>
-                <Text style={styles.listCatAr}>{cat.ar}</Text>
-                <Text style={styles.listCatCount}>{listDuas.length} supplications</Text>
+        <LinearGradient
+          colors={['transparent', `${C.bg}E0`, C.bg]}
+          style={[styles.floatingActionBar, { paddingBottom: insets.bottom || rs(20) }]}
+        >
+          <View style={styles.actionRow}>
+            <PressScale style={{ flex: 2 }} onPress={() => toggleSave(dua.id)}>
+              <View style={[styles.btnPrimary, isSaved && styles.btnPrimaryActive]}>
+                <Ionicons
+                  name={isSaved ? 'bookmark' : 'bookmark-outline'}
+                  size={rs(20)}
+                  color={isSaved ? C.bg : C.textHigh}
+                />
+                <Text style={[styles.btnPrimaryText, isSaved && { color: C.bg }]}>
+                  {isSaved ? 'Saved' : 'Save Dua'}
+                </Text>
               </View>
-            </View>
-          );
-        })()}
+            </PressScale>
 
-        <View style={styles.searchWrap}>
-          <Ionicons name="search" size={rs(17)} color={C.muted} />
-          <TextInput placeholder="Search…" placeholderTextColor={C.dimmed} style={styles.searchInput} value={searchQuery} onChangeText={setSearchQuery} returnKeyType="search" clearButtonMode="while-editing" selectionColor={C.mint} />
-        </View>
+            <PressScale style={{ flex: 1 }} onPress={() => setCopySheetDua(dua)}>
+              <View style={styles.btnSecondary}>
+                <Feather name="copy" size={rs(20)} color={C.mint} />
+              </View>
+            </PressScale>
 
-        <FlatList
-          data={listDuas}
-          keyExtractor={item => item.id}
-          renderItem={({ item }) => <DuaListCard item={item} isSaved={savedIds.includes(item.id)} onPress={() => openDua(item)} onSave={() => toggleSave(item.id)} />}
-          contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + rs(60) }]}
-          initialNumToRender={14}
-          maxToRenderPerBatch={12}
-          windowSize={7}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyEmoji}>🔍</Text>
-              <Text style={styles.emptyTitle}>No duas found</Text>
-              <Text style={styles.emptySubtitle}>Try adjusting your search</Text>
-            </View>
-          }
-        />
+            <PressScale
+              style={{ flex: 1 }}
+              onPress={() => Share.share({ message: `${dua.arabic}\n\n${dua.translation}\n— ${dua.reference}` })}
+            >
+              <View style={styles.btnSecondary}>
+                <Feather name="share-2" size={rs(20)} color={C.mint} />
+              </View>
+            </PressScale>
+          </View>
+        </LinearGradient>
       </View>
     );
-  }
+  };
 
-  /* ─────────────────────────────────────
-     VIEW: CATEGORIES (main / home)
-  ───────────────────────────────────── */
+  // ─────────────────────────────────────────────
+  // ROOT RENDER
+  // ─────────────────────────────────────────────
   return (
     <View style={styles.root}>
-      <LinearGradient colors={[C.bg0, C.bg1]} style={StyleSheet.absoluteFill} />
       {renderHeader()}
 
-      <View style={styles.tabBar}>
-        <TouchableOpacity style={styles.tabItem} onPress={() => { setActiveTab('categories'); Haptics.selectionAsync(); }} activeOpacity={0.8}>
-          <Text style={[styles.tabText, activeTab === 'categories' && styles.tabTextActive]}>Categories</Text>
-          {activeTab === 'categories' && <View style={styles.tabUnderline} />}
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.tabItem} onPress={() => { setActiveTab('saved'); setActiveCategoryId(null); setView('list'); Haptics.selectionAsync(); }} activeOpacity={0.8}>
-          <Text style={[styles.tabText, activeTab === 'saved' && styles.tabTextActive]}>My Duas {savedIds.length > 0 ? `(${savedIds.length})` : ''}</Text>
-          {activeTab === 'saved' && <View style={styles.tabUnderline} />}
-        </TouchableOpacity>
+      <View style={[styles.contentContainer, isTablet && styles.contentContainerTablet]}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          {currentScreen.name === 'detail'
+            ? renderDetail(currentScreen.dua, currentScreen.categoryDuas)
+            : renderHomeOrCategory()}
+        </KeyboardAvoidingView>
       </View>
 
-      <View style={styles.tabDivider} />
+      {copySheetDua && (
+        <CopyActionSheet
+          visible={!!copySheetDua}
+          onClose={() => setCopySheetDua(null)}
+          onCopyArabic={() => handleCopyArabic(copySheetDua.arabic)}
+          onCopyFull={() => handleCopyFull(copySheetDua)}
+        />
+      )}
 
-      <View style={[styles.searchWrap, { marginHorizontal: rs(20), marginBottom: rs(4) }]}>
-        <Ionicons name="search" size={rs(17)} color={C.muted} />
-        <TextInput placeholder="Search duas…" placeholderTextColor={C.dimmed} style={styles.searchInput} value={searchQuery} onChangeText={text => { setSearchQuery(text); if (text.trim()) { setActiveCategoryId(null); setView('list'); } }} returnKeyType="search" clearButtonMode="while-editing" selectionColor={C.mint} />
-      </View>
-
-      <Text style={styles.sourceLabel}>Hisnul Muslim (Fortress of the Muslim)</Text>
-
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.catGrid, { paddingBottom: insets.bottom + rs(60) }]}>
-        {CATEGORIES.reduce<CategoryDef[][]>((rows, cat, i) => {
-          if (i % numColumns === 0) rows.push([cat]);
-          else rows[rows.length - 1].push(cat);
-          return rows;
-        }, []).map((row, rowIdx) => (
-          <View key={`row-${rowIdx}`} style={[styles.catRow, { marginBottom: CARD_GAP }]}>
-            {row.map(cat => (
-              <CategoryCard key={cat.id} cat={cat} count={categoryCounts[cat.id] ?? 0} onPress={() => openCategory(cat.id)} cardWidth={CARD_W} cardHeight={CARD_H} />
-            ))}
-            {/* Filler for empty spaces in the grid */}
-            {Array.from({ length: numColumns - row.length }).map((_, i) => (
-              <View key={`empty-${i}`} style={{ width: CARD_W }} />
-            ))}
-          </View>
-        ))}
-      </ScrollView>
+      {toast.visible && (
+        <Animated.View style={[styles.toast, { opacity: toastOpacity, top: insets.top + rs(60) }]}>
+          <Ionicons name={toast.icon as any} size={rs(18)} color={C.mint} />
+          <Text style={styles.toastText}>{toast.message}</Text>
+        </Animated.View>
+      )}
     </View>
   );
 }
-
-/* ─────────────────────────────────────────
-   STYLES
-───────────────────────────────────────── */
+// ─────────────────────────────────────────────
+// STYLES
+// ─────────────────────────────────────────────
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg0 },
+  root: { flex: 1, backgroundColor: C.bg },
 
-  /* ── Header ── */
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: rs(16), paddingBottom: rs(12), backgroundColor: 'transparent' },
-  headerBackBtn: { width: rs(38), height: rs(38), borderRadius: rs(12), alignItems: 'center', justifyContent: 'center', backgroundColor: C.bg3, borderWidth: 1, borderColor: C.border },
-  headerTitle: { flex: 1, textAlign: 'center', fontSize: rs(17), fontWeight: '700', color: C.cream, letterSpacing: 0.2, marginHorizontal: rs(8) },
+  // FIX 15: Tablet content centering
+  contentContainer: { flex: 1 },
+  contentContainerTablet: { maxWidth: 700, width: '100%', alignSelf: 'center' },
 
-  /* ── Tabs ── */
-  tabBar: { flexDirection: 'row', paddingHorizontal: rs(20) },
-  tabItem: { marginRight: rs(28), paddingBottom: rs(10), position: 'relative' },
-  tabText: { fontSize: rs(15), fontWeight: '600', color: C.dimmed },
-  tabTextActive: { color: C.mint, fontWeight: '700' },
-  tabUnderline: { position: 'absolute', bottom: 0, left: 0, right: 0, height: rs(2.5), borderRadius: rs(2), backgroundColor: C.mint },
-  tabDivider: { height: 1, backgroundColor: C.border, marginBottom: rs(14) },
+  scrollPad: { paddingHorizontal: rs(20), paddingTop: rs(8) },
 
-  /* ── Search ── */
-  searchWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.bg2, borderRadius: rs(13), paddingHorizontal: rs(14), height: rs(44), borderWidth: 1, borderColor: C.border, marginBottom: rs(12) },
-  searchInput: { flex: 1, color: C.cream, fontSize: rs(14), marginLeft: rs(10), paddingVertical: 0, includeFontPadding: false, textAlignVertical: 'center' },
-  sourceLabel: { fontSize: rs(12), color: C.dimmed, fontWeight: '500', paddingHorizontal: rs(20), marginBottom: rs(14), letterSpacing: 0.2 },
-
-  /* ── Grid & Cards ── */
-  catGrid: { paddingHorizontal: rs(20), paddingTop: rs(2) },
-  catRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  catCard: { borderRadius: rs(18), borderWidth: 1, padding: rs(14), justifyContent: 'space-between', overflow: 'hidden', ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6 }, android: { elevation: 4 } }) },
-  catEmoji: { fontSize: rs(34), textAlign: 'right', textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 },
-  catTextBlock: { marginTop: rs(8), flex: 1, justifyContent: 'flex-end' },
-  catArabic: { fontSize: rs(18), fontWeight: '700', color: C.cream, lineHeight: rs(26), writingDirection: 'rtl', textAlign: 'left', marginBottom: rs(4) },
-  catEnglish: { fontSize: rs(11), fontWeight: '600', color: C.muted, textTransform: 'uppercase', letterSpacing: 0.6 },
-  catCountBadge: { alignSelf: 'flex-start', marginTop: rs(10), backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: rs(8), paddingHorizontal: rs(9), paddingVertical: rs(4) },
-  catCount: { fontSize: rs(11), fontWeight: '700', color: C.mint },
-
-  /* ── List ── */
-  listCatStrip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: rs(20), marginBottom: rs(14) },
-  listCatEmoji: { fontSize: rs(32), marginRight: rs(12) },
-  listCatAr: { fontSize: rs(17), fontWeight: '700', color: C.cream, writingDirection: 'rtl', lineHeight: rs(24) },
-  listCatCount: { fontSize: rs(12), color: C.muted, fontWeight: '500', marginTop: rs(2) },
-  listContent: { paddingHorizontal: rs(16), paddingTop: rs(6) },
-  duaCard: { backgroundColor: C.bg2, borderRadius: rs(16), borderWidth: 1, borderColor: C.border, overflow: 'hidden', ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 5 }, android: { elevation: 3 } }) },
-  duaCardInner: { flexDirection: 'row', alignItems: 'center' },
-  duaCardAccent: { width: rs(3), alignSelf: 'stretch', backgroundColor: C.mint, opacity: 0.55 },
-  duaCardText: { flex: 1, paddingVertical: rs(14), paddingHorizontal: rs(14) },
-  duaCardTitle: { fontSize: rs(15), fontWeight: '700', color: C.cream, lineHeight: rs(21), marginBottom: rs(5) },
-  duaCardPreview: { fontSize: rs(13), color: C.muted, writingDirection: 'rtl', lineHeight: rs(18) },
-  duaSaveBtn: { paddingRight: rs(16), paddingLeft: rs(8), paddingVertical: rs(14) },
-
-  /* ── Empty ── */
-  emptyState: { alignItems: 'center', paddingTop: rs(80) },
-  emptyEmoji: { fontSize: rs(48), marginBottom: rs(16) },
-  emptyTitle: { fontSize: rs(18), fontWeight: '700', color: C.muted, marginBottom: rs(8) },
-  emptySubtitle: { fontSize: rs(14), color: C.dimmed, textAlign: 'center' },
-
-  /* ── Detail ── */
-  detailScroll: { paddingHorizontal: rs(20), paddingTop: rs(6) },
-  detailCatChip: { flexDirection: 'row', alignItems: 'center', alignSelf: 'center', backgroundColor: C.mintBg, borderWidth: 1, borderColor: C.mintBorder, borderRadius: rs(20), paddingHorizontal: rs(14), paddingVertical: rs(6), marginBottom: rs(20) },
-  detailCatEmoji: { fontSize: rs(15), marginRight: rs(6) },
-  detailCatLabel: { fontSize: rs(12), fontWeight: '700', color: C.mint, textTransform: 'uppercase', letterSpacing: 0.8 },
-
-  /* Arabic Fixed Container */
-  arabicCard: { backgroundColor: C.bg2, borderRadius: rs(20), borderWidth: 1, borderColor: C.borderMid, padding: rs(10), marginBottom: rs(16), overflow: 'hidden', position: 'relative', ...Platform.select({ ios: { shadowColor: C.mint, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.1, shadowRadius: 14 }, android: { elevation: 5 } }) },
-  arabicCornerTL: { position: 'absolute', top: rs(12), left: rs(12), width: rs(20), height: rs(20), borderTopWidth: 1.5, borderLeftWidth: 1.5, borderColor: C.mint, opacity: 0.4, zIndex: 10 },
-  arabicCornerBR: { position: 'absolute', bottom: rs(12), right: rs(12), width: rs(20), height: rs(20), borderBottomWidth: 1.5, borderRightWidth: 1.5, borderColor: C.mint, opacity: 0.4, zIndex: 10 },
-  
-  /* CRITICAL: Arabic Text Fixes */
-  arabicText: { 
-    fontSize: rs(28),
-    color: C.cream,
-    textAlign: 'right', 
-    writingDirection: 'rtl', 
-    lineHeight: rs(64), // High line height stops overlapping
-    fontFamily: 'IndoPakQuran', 
-    includeFontPadding: false 
+  // Header
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: rs(20),
+    paddingBottom: rs(12),
+    borderBottomWidth: 1,
+    borderColor: C.border,
+    gap: rs(10),
+  },
+  // FIX 16: iconBtn is at least 48x48
+  iconBtn: {
+    width: rs(48),
+    height: rs(48),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerCenter: { flex: 1, alignItems: 'center' },
+  headerTitle: {
+    fontSize: rs(17),
+    fontWeight: '700',
+    color: C.textHigh,
+    letterSpacing: 0.5,
+    textAlign: 'center',
+  },
+  // FIX 6: Breadcrumb
+  breadcrumb: {
+    fontSize: rs(11),
+    color: C.textLow,
+    marginTop: rs(2),
+    textAlign: 'center',
+    letterSpacing: 0.2,
   },
 
-  /* Dividers & Text */
-  sectionDivider: { flexDirection: 'row', alignItems: 'center', marginBottom: rs(14) },
-  dividerLine: { flex: 1, height: 1, backgroundColor: C.border },
-  dividerLabel: { fontSize: rs(11), fontWeight: '700', color: C.dimmed, textTransform: 'uppercase', letterSpacing: 1.2, marginHorizontal: rs(12) },
-  translationCard: { backgroundColor: C.bg2, borderRadius: rs(18), borderWidth: 1, borderColor: C.border, padding: rs(20), marginBottom: rs(12) },
-  translationText: { fontSize: rs(15), color: C.beige, lineHeight: rs(25), textAlign: 'center', fontWeight: '400' },
-  refRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: rs(28) },
-  refText: { fontSize: rs(13), color: C.dimmed, fontStyle: 'italic', marginLeft: rs(6), textAlign: 'center', flexShrink: 1 },
+  // FIX 5: Saved chip
+  savedChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: rs(4),
+    paddingHorizontal: rs(10),
+    paddingVertical: rs(6),
+    borderRadius: rs(20),
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.border,
+    minHeight: rs(36),
+  },
+  savedChipActive: {
+    backgroundColor: C.mint,
+    borderColor: C.mint,
+  },
+  savedChipText: {
+    fontSize: rs(13),
+    fontWeight: '600',
+    color: C.textMed,
+  },
+  savedChipTextActive: {
+    color: C.bg,
+  },
 
-  /* Actions */
-  actionRow: { flexDirection: 'row', backgroundColor: C.bg2, borderRadius: rs(16), borderWidth: 1, borderColor: C.border, overflow: 'hidden' },
-  actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: rs(15) },
-  actionDivider: { width: 1, backgroundColor: C.border, marginVertical: rs(10) },
-  actionText: { fontSize: rs(13), fontWeight: '600', color: C.mint, marginLeft: rs(7) },
+  // Search
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.surface,
+    marginHorizontal: rs(20),
+    marginTop: rs(16),
+    marginBottom: rs(12),
+    paddingHorizontal: rs(16),
+    height: rs(50),
+    borderRadius: rs(16),
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  searchInput: { flex: 1, color: C.textHigh, fontSize: rs(15), marginLeft: rs(12) },
+
+  // FIX 21: Context banner
+  contextBanner: { paddingHorizontal: rs(24), paddingBottom: rs(10) },
+  contextText: { fontSize: rs(13), color: C.textLow, fontWeight: '500' },
+
+  // FIX 22: Grid card hierarchy
+  gridCard: {
+    backgroundColor: C.surface,
+    padding: rs(18),
+    borderRadius: rs(20),
+    borderWidth: 1,
+    borderColor: C.border,
+    minHeight: rs(115),
+    justifyContent: 'flex-end',
+    gap: rs(4),
+    overflow: 'hidden',
+  },
+  gridCardRecent: {
+    borderColor: `${C.mint}40`,
+    backgroundColor: C.surfaceElevated,
+  },
+  recentBadge: {
+    position: 'absolute',
+    top: rs(10),
+    right: rs(10),
+    backgroundColor: C.mintDim,
+    paddingHorizontal: rs(8),
+    paddingVertical: rs(2),
+    borderRadius: rs(8),
+  },
+  recentBadgeText: { fontSize: rs(10), color: C.mint, fontWeight: '700', letterSpacing: 0.3 },
+  // FIX 22: Emoji large, clearly dominant
+  gridEmoji: { fontSize: rs(30), marginBottom: rs(8) },
+  // Arabic medium weight
+  gridAr: { fontSize: rs(16), fontWeight: '700', color: C.textHigh, writingDirection: 'rtl', letterSpacing: 0.3 },
+  // English small + dim
+  gridEn: { fontSize: rs(12), color: C.textLow, fontWeight: '500', letterSpacing: 0.2 },
+
+  // List Cards
+  listCard: {
+    backgroundColor: C.surface,
+    borderRadius: rs(18),
+    borderWidth: 1,
+    borderColor: C.border,
+    padding: rs(18),
+    marginBottom: rs(12),
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  listCardContent: { flex: 1, paddingRight: rs(16) },
+  listCardTitle: {
+    fontSize: rs(16),
+    fontWeight: '700',
+    color: C.textHigh,
+    marginBottom: rs(6),
+    lineHeight: rs(22),
+  },
+  listCardPreview: {
+    fontSize: rs(15),
+    color: C.textLow,
+    fontFamily: 'IndoPakQuran',
+    writingDirection: 'rtl',
+  },
+  // FIX 16: min 48x48
+  listCardAction: {
+    width: rs(48),
+    height: rs(48),
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: C.mintDim,
+    borderRadius: rs(14),
+  },
+
+  // FIX 20: Highlight style
+  highlight: {
+    color: C.mint,
+    backgroundColor: C.mintDim,
+    borderRadius: rs(3),
+  },
+
+  // FIX 3: Dua navigation row
+  duaNavRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: rs(16),
+    paddingHorizontal: rs(4),
+  },
+  duaNavBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: rs(4),
+    paddingVertical: rs(8),
+    paddingHorizontal: rs(12),
+    backgroundColor: C.surface,
+    borderRadius: rs(12),
+    borderWidth: 1,
+    borderColor: C.border,
+    minWidth: rs(80),
+    justifyContent: 'center',
+    minHeight: rs(40),
+  },
+  duaNavBtnDisabled: { opacity: 0.4 },
+  duaNavText: { fontSize: rs(13), fontWeight: '600', color: C.mint },
+  duaNavCount: { fontSize: rs(13), color: C.textLow, fontWeight: '500' },
+
+  // Detail View
+  detailHeader: {
+    paddingVertical: rs(16),
+    borderBottomWidth: 1,
+    borderColor: C.divider,
+    marginBottom: rs(24),
+  },
+  detailTitle: {
+    fontSize: rs(20),
+    fontWeight: '700',
+    color: C.textHigh,
+    lineHeight: rs(28),
+  },
+
+  arabicContainer: { marginBottom: rs(32), paddingHorizontal: rs(10) },
+  // FIX 12 + FIX 13: includeFontPadding false, lineHeight rs(52)
+  arabicText: {
+    fontSize: rs(30),
+    color: C.textHigh,
+    textAlign: 'right',
+    writingDirection: 'rtl',
+    lineHeight: rs(52),
+    fontFamily: 'IndoPakQuran',
+    includeFontPadding: false,
+  },
+
+  translationContainer: {
+    backgroundColor: C.surface,
+    borderRadius: rs(20),
+    padding: rs(24),
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  translationText: {
+    fontSize: rs(16),
+    color: C.textMed,
+    lineHeight: rs(26),
+    marginBottom: rs(20),
+  },
+  referenceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.mintDim,
+    alignSelf: 'flex-start',
+    paddingHorizontal: rs(12),
+    paddingVertical: rs(6),
+    borderRadius: rs(8),
+  },
+  referenceText: { fontSize: rs(13), color: C.mint, marginLeft: rs(6), fontWeight: '500' },
+
+  // FIX 23: Floating bar (reduced opacity gradient)
+  floatingActionBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingTop: rs(40),
+    paddingHorizontal: rs(20),
+  },
+  actionRow: { flexDirection: 'row', gap: rs(12) },
+  btnPrimary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: C.surfaceHighlight,
+    borderWidth: 1,
+    borderColor: C.mint,
+    borderRadius: rs(18),
+    height: rs(56),
+    gap: rs(8),
+  },
+  btnPrimaryActive: { backgroundColor: C.mint, borderColor: C.mint },
+  btnPrimaryText: { fontSize: rs(16), fontWeight: '700', color: C.textHigh },
+  btnSecondary: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: C.surface,
+    borderRadius: rs(18),
+    height: rs(56),
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+
+  // Empty State
+  emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingTop: rs(80) },
+  emptyTitle: { fontSize: rs(18), fontWeight: '700', color: C.textMed, marginBottom: rs(8) },
+  emptySub: { fontSize: rs(14), color: C.textLow },
+
+  // Toast
+  toast: {
+    position: 'absolute',
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.toastBg,
+    paddingHorizontal: rs(18),
+    paddingVertical: rs(12),
+    borderRadius: rs(30),
+    gap: rs(8),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 5,
+    zIndex: 999,
+  },
+  toastText: { color: C.textHigh, fontSize: rs(14), fontWeight: '600' },
+
+  // FIX 4: Copy Action Sheet
+  sheetOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  sheetContainer: {
+    backgroundColor: C.surfaceHighlight,
+    borderTopLeftRadius: rs(24),
+    borderTopRightRadius: rs(24),
+    paddingHorizontal: rs(24),
+    paddingBottom: rs(40),
+    paddingTop: rs(12),
+    borderWidth: 1,
+    borderColor: C.border,
+    borderBottomWidth: 0,
+  },
+  sheetHandle: {
+    width: rs(36),
+    height: rs(4),
+    backgroundColor: C.border,
+    borderRadius: rs(2),
+    alignSelf: 'center',
+    marginBottom: rs(20),
+  },
+  sheetTitle: {
+    fontSize: rs(16),
+    fontWeight: '700',
+    color: C.textHigh,
+    marginBottom: rs(20),
+    textAlign: 'center',
+  },
+  sheetOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: rs(14),
+    paddingVertical: rs(16),
+    minHeight: rs(56),
+  },
+  sheetOptionText: { fontSize: rs(16), color: C.textHigh, fontWeight: '500' },
+  sheetDivider: { height: 1, backgroundColor: C.divider },
+  sheetCancel: {
+    marginTop: rs(12),
+    alignItems: 'center',
+    paddingVertical: rs(16),
+    backgroundColor: C.surface,
+    borderRadius: rs(16),
+    minHeight: rs(56),
+    justifyContent: 'center',
+  },
+  sheetCancelText: { fontSize: rs(16), color: C.textMed, fontWeight: '600' },
 });

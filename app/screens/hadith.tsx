@@ -350,47 +350,6 @@ const HadithOfTheDay: React.FC = () => {
           </Animated.View>
 
           {/* ── ACTION ROW ── */}
-          <Animated.View style={[s.actionRow, { opacity: fade }]}>
-            {/* Bookmark */}
-            <Press onPress={() => setBM(v => !v)} style={s.actionBtn}>
-              <View style={[s.actionBtnInner, bookmarked && s.actionBtnActive]}>
-                <MaterialCommunityIcons
-                  name={bookmarked ? 'bookmark' : 'bookmark-outline'}
-                  size={rs(20)}
-                  color={bookmarked ? C.g3 : C.inkC}
-                />
-                <Text style={[s.actionLbl, bookmarked && { color: C.g3 }]}>Save</Text>
-              </View>
-            </Press>
-
-            {/* Like */}
-            <Press onPress={() => setLiked(v => !v)} style={s.actionBtn}>
-              <View style={[s.actionBtnInner, liked && s.actionBtnActiveRed]}>
-                <MaterialCommunityIcons
-                  name={liked ? 'heart' : 'heart-outline'}
-                  size={rs(20)}
-                  color={liked ? '#E85050' : C.inkC}
-                />
-                <Text style={[s.actionLbl, liked && { color: '#E85050' }]}>Like</Text>
-              </View>
-            </Press>
-
-            {/* Share */}
-            <Press onPress={handleShare} style={s.actionBtn}>
-              <View style={s.actionBtnInner}>
-                <Feather name="share-2" size={rs(19)} color={C.inkC} />
-                <Text style={s.actionLbl}>Share</Text>
-              </View>
-            </Press>
-
-            {/* Copy — just visual, extend as needed */}
-            <Press onPress={() => {}} style={s.actionBtn}>
-              <View style={s.actionBtnInner}>
-                <Feather name="copy" size={rs(18)} color={C.inkC} />
-                <Text style={s.actionLbl}>Copy</Text>
-              </View>
-            </Press>
-          </Animated.View>
 
           {/* ── BOOK + VOLUME INFO CARD ── */}
           <Animated.View style={[s.metaCard, { opacity: fade }]}>

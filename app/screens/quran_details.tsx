@@ -9,7 +9,6 @@ import {
   Modal,
   PixelRatio,
   Platform,
-  SafeAreaView,
   StatusBar,
   StyleSheet,
   Switch,
@@ -17,10 +16,11 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-
+import { SafeAreaView } from 'react-native-safe-area-context'; // ✅ Add this line
 // Library 1: react-native-responsive-screen (Percentage layouts)
 import { widthPercentageToDP as wp } from 'react-native-responsive-screen';
-
+// 🚨 IMPORT YOUR NEW AUDIO SERVICE
+import { fetchAyahAudioUrlFromBackend, fetchJuzDetailsFromBackend, fetchSurahDetailsFromBackend } from '../services/quranService';
 // Library 2: react-native-size-matters (Scaling fonts/spacing)
 import { moderateScale, scale, verticalScale } from 'react-native-size-matters';
 
@@ -75,32 +75,24 @@ const SurahDetailScreen = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const arabicEdition = "quran-indian"; // IndoPak script
-      const translationEdition = "en.sahih";
       let combined: Ayah[] = [];
 
       if (surahNumber) {
-        const res = await fetch(`https://api.alquran.cloud/v1/surah/${surahNumber}/editions/${arabicEdition},${translationEdition}`);
-        if (!res.ok) throw new Error(`Status ${res.status}`);
-        const json = await res.json();
-        combined = json.data[0].ayahs.map((a: any, i: number) => ({
+        // Fetch from NestJS!
+        const data = await fetchSurahDetailsFromBackend(surahNumber);
+        
+        // data[0] is Arabic, data[1] is English
+        combined = data[0].ayahs.map((a: any, i: number) => ({
           ...a,
-          translation: json.data[1].ayahs[i].text
+          translation: data[1].ayahs[i].text
         }));
       } else if (juzNumber) {
-        const [resAr, resEn] = await Promise.all([
-          fetch(`https://api.alquran.cloud/v1/juz/${juzNumber}/${arabicEdition}`),
-          fetch(`https://api.alquran.cloud/v1/juz/${juzNumber}/${translationEdition}`)
-        ]);
-
-        if (!resAr.ok || !resEn.ok) throw new Error("Juz API error");
-
-        const jsonAr = await resAr.json();
-        const jsonEn = await resEn.json();
-
-        combined = jsonAr.data.ayahs.map((a: any, i: number) => ({
+        // Fetch from NestJS!
+        const data = await fetchJuzDetailsFromBackend(juzNumber);
+        
+        combined = data[0].ayahs.map((a: any, i: number) => ({
           ...a,
-          translation: jsonEn.data.ayahs[i].text
+          translation: data[1].ayahs[i].text
         }));
       }
       setAyahs(combined);
@@ -121,8 +113,11 @@ const SurahDetailScreen = () => {
       }
       if (sound) await sound.unloadAsync();
 
+      // 🚨 CHANGED 1: Fetch the secure audio URL from your NestJS backend
+      const audioUrl = await fetchAyahAudioUrlFromBackend(globalNumber);
+
       const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: `https://cdn.islamic.network/quran/audio/128/ar.alafasy/${globalNumber}.mp3` },
+        { uri: audioUrl }, // 🚨 CHANGED 2: Use the backend URL here
         { shouldPlay: true }
       );
 
@@ -137,7 +132,7 @@ const SurahDetailScreen = () => {
       setPlayingAyah(ayahNumber);
       setIsPlaying(true);
     } catch (e) {
-      console.error(e);
+      console.error("Audio Playback Error:", e);
     }
   };
 

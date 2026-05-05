@@ -7,116 +7,142 @@ import {
   Dimensions,
   Platform,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { widthPercentageToDP as wp } from "react-native-responsive-screen";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { moderateScale, scale, verticalScale } from "react-native-size-matters";
 
 /* ─────────────────────────────────────────
-   RESPONSIVE SCALE
+   RESPONSIVE UTILITIES & TABLET CONSTRAINTS
 ───────────────────────────────────────── */
-const { width: W } = Dimensions.get("window");
-const rs = (n: number) => Math.round((n / 390) * W);
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const isTablet = SCREEN_WIDTH >= 768;
+
+const fontScale = (size: number) =>
+  Platform.OS === "android" ? moderateScale(size, 0.3) : moderateScale(size);
+
+const CONTENT_MAX_WIDTH = 800;
+const ACTUAL_CONTENT_WIDTH = isTablet ? Math.min(SCREEN_WIDTH, CONTENT_MAX_WIDTH) : SCREEN_WIDTH;
 
 /* ─────────────────────────────────────────
-   DESIGN TOKENS — Refined dark jewel palette
+   DESIGN TOKENS — Matching Home Screen
 ───────────────────────────────────────── */
 const C = {
-  bg:         "#060E0E",
-  bgRich:     "#081212",
-  panel:      "#0B1A1A",
-  card:       "#0D2020",
-  cardLt:     "#102828",
-  cardDeep:   "#040C0C",
-  beige:      "#E8DFC8",
-  beigeSoft:  "#F2EBD8",
-  ink:        "#EDF5F3",
-  inkMid:     "#9AC4BC",
-  inkDim:     "#5A8880",
-  inkFaint:   "rgba(180,220,210,0.30)",
-  teal:       "#2FD9C8",
-  tealSoft:   "#6BE8DA",
-  tealGlow:   "rgba(47,217,200,0.18)",
-  tealDim:    "rgba(47,217,200,0.10)",
-  gold:       "#E8B84B",
-  goldSoft:   "#F5D47E",
-  goldGlow:   "rgba(232,184,75,0.15)",
-  coral:      "#E07265",
-  coralSoft:  "#F5A090",
-  coralGlow:  "rgba(224,114,101,0.15)",
-  aqua:       "#1A9E94",
-  shadow:     "#010707",
+  bg:           "#0A4A4A",
+  bgDeep:       "#062E2E",
+  bgMid:        "#0D5858",
+  surface:      "#FFFFFF",
+  surfaceAlt:   "#F0F8F6",
+  surfaceDim:   "#E6F4F2",
+
+  teal0:        "#041E1E",
+  teal1:        "#0A4A4A",
+  teal2:        "#0D5858",
+  teal3:        "#12706E",
+  teal4:        "#1A9490",
+  teal5:        "#4BA89E",
+  tealLt:       "#A8DDD8",
+  tealPale:     "#D4EFEC",
+
+  gold:         "#D4942A",
+  goldBright:   "#E8B84B",
+  goldDeep:     "#B8791E",
+  goldPale:     "#FDF5E0",
+  goldSoft:     "#F5E8C8",
+
+  ink:          "#072424",
+  inkMid:       "#2E6060",
+  inkLight:     "#6AABA5",
+  inkFaint:     "rgba(7,36,36,0.30)",
+  white:        "#FFFFFF",
+  whiteSemi:    "rgba(255,255,255,0.92)",
+  whiteGhost:   "rgba(255,255,255,0.12)",
+  whiteHush:    "rgba(255,255,255,0.06)",
+
+  coral:        "#E07060",
+  rose:         "#D4607A",
+  purple:       "#7C6BA8",
+  moss:         "#4A7A5A",
 };
 
 /* ─────────────────────────────────────────
    SECTION THEMES
 ───────────────────────────────────────── */
-const SECTION_THEME = {
+const THEMES = {
   Deen: {
-    accent:     "#2FD9C8",
-    accentSoft: "#70EAE0",
-    accentDim:  "rgba(47,217,200,0.12)",
-    accentGlow: "rgba(47,217,200,0.05)",
-    gradA:      "#0D4E4A",
-    gradB:      "#071E1C",
-    iconBg:     "rgba(47,217,200,0.15)",
-    border:     "rgba(47,217,200,0.22)",
-    glowColor:  "rgba(47,217,200,0.06)",
+    primary:   C.teal3,
+    light:     "#E8F5F3",
+    border:    "#C8E8E4",
+    gradient:  ["#0A4A4A", "#12706E"] as [string, string],
+    cardBg:    "#F0FAF8",
+    icon:      "🌙",
   },
   Utility: {
-    accent:     "#E8B84B",
-    accentSoft: "#F5D47E",
-    accentDim:  "rgba(232,184,75,0.12)",
-    accentGlow: "rgba(232,184,75,0.05)",
-    gradA:      "#3E2E08",
-    gradB:      "#1A1204",
-    iconBg:     "rgba(232,184,75,0.15)",
-    border:     "rgba(232,184,75,0.22)",
-    glowColor:  "rgba(232,184,75,0.06)",
+    primary:   C.gold,
+    light:     C.goldPale,
+    border:    C.goldSoft,
+    gradient:  ["#B8791E", "#D4942A"] as [string, string],
+    cardBg:    "#FDFAF2",
+    icon:      "⚡",
   },
   Makkah: {
-    accent:     "#E07265",
-    accentSoft: "#F5A090",
-    accentDim:  "rgba(224,114,101,0.12)",
-    accentGlow: "rgba(224,114,101,0.05)",
-    gradA:      "#3E1610",
-    gradB:      "#1A0A08",
-    iconBg:     "rgba(224,114,101,0.15)",
-    border:     "rgba(224,114,101,0.22)",
-    glowColor:  "rgba(224,114,101,0.06)",
+    primary:   C.coral,
+    light:     "#FDF2F0",
+    border:    "#F7DAD6",
+    gradient:  ["#C05848", "#E07060"] as [string, string],
+    cardBg:    "#FFF4F2",
+    icon:      "🕌",
+  },
+  Marketplace: {
+    primary:   "#7C6BA8",
+    light:     "#F2F0F8",
+    border:    "#DDD8EE",
+    gradient:  ["#5C4E88", "#7C6BA8"] as [string, string],
+    cardBg:    "#F6F4FC",
+    icon:      "🛍️",
   },
 } as const;
 
-type SectionKey = keyof typeof SECTION_THEME;
-type ThemeType  = typeof SECTION_THEME[SectionKey];
+type SectionKey = keyof typeof THEMES;
+type ThemeType  = typeof THEMES[SectionKey];
 
 /* ─────────────────────────────────────────
    TYPES
 ───────────────────────────────────────── */
 type MCIconName = keyof typeof MaterialCommunityIcons.glyphMap;
+
 type FeatureItem = {
   label:    string;
   icon:     MCIconName;
   route:    string;
   featured?: boolean;
   desc?:    string;
+  badge?:   string;
 };
+
 type FeatureSection = {
-  title: string;
-  items: FeatureItem[];
+  title:     string;
+  subtitle?: string;
+  gridCols?: number;
+  items:     FeatureItem[];
 };
 
 /* ─────────────────────────────────────────
-   DATA — with descriptions
+   DATA
 ───────────────────────────────────────── */
 const FEATURE_SECTIONS: FeatureSection[] = [
   {
     title: "Deen",
+    subtitle: "Spiritual essentials",
+    gridCols: 3,
     items: [
-      { label: "Prayer Times", icon: "clock-outline",                  route: "/(tabs)/prayer",  featured: true, desc: "Daily salah schedule" },
+      { label: "Prayer Times", icon: "clock-outline",                  route: "/(tabs)/prayer",  featured: true, desc: "Daily salah schedule", badge: "LIVE" },
       { label: "Quran",        icon: "book-open-page-variant-outline", route: "/(tabs)/quran",   desc: "Read & reflect" },
       { label: "Tasbih",       icon: "gesture-tap",                    route: "/(tabs)/tasbeeh", desc: "Digital counter" },
       { label: "Qibla",        icon: "compass-outline",                route: "/(tabs)/qibla",   desc: "Find direction" },
@@ -130,152 +156,176 @@ const FEATURE_SECTIONS: FeatureSection[] = [
   },
   {
     title: "Utility",
+    subtitle: "Tools & trackers",
+    gridCols: 3,
     items: [
-      { label: "Journal",  icon: "notebook-outline",            route: "./journal",   desc: "Daily reflections" },
-      { label: "Tracker",  icon: "chart-bell-curve-cumulative", route: "./tracker",   desc: "Habit monitor" },
-      { label: "Calendar", icon: "calendar-blank-outline",      route: "./calender",  desc: "Hijri dates" },
-      { label: "Zakat",    icon: "hand-coin-outline",           route: "./zakat",     desc: "Calculate dues" },
-      { label: "Shahadah", icon: "star-crescent",               route: "./kalima",    desc: "Core beliefs" },
-      { label: "99 Names", icon: "star-four-points-outline",    route: "./names",     desc: "Asma ul Husna" },
+      { label: "Reflect",   icon: "notebook-outline",             route: "./journal",   desc: "Daily reflections" },
+      { label: "Tracker",   icon: "chart-bell-curve-cumulative",  route: "./tracker",   desc: "Habit monitor" },
+      { label: "Calendar",  icon: "calendar-blank-outline",       route: "./calender",  desc: "Hijri dates" },
+      { label: "Zakat",     icon: "hand-coin-outline",            route: "./zakat",     desc: "Calculate dues" },
+      { label: "Shahadah",  icon: "star-crescent",                route: "./kalima",    desc: "Core beliefs" },
+      { label: "99 Names",  icon: "star-four-points-outline",     route: "./names",     desc: "Asma ul Husna" },
+    ],
+  },
+  {
+    title: "Marketplace",
+    subtitle: "Halal commerce",
+    gridCols: 2,
+    items: [
+      { label: "Matrimonial",  icon: "account-heart-outline", route: "./Matrimonial", desc: "Find your life partner", badge: "NEW" },
+      { label: "Halal Food",   icon: "food-halal",            route: "./halalfoods",        desc: "Certified eateries" },
+      { label: "Pilgrim Tour", icon: "mosque",                route: "./pilgrim",     desc: "Hajj & Umrah services" },
+      { label: "Halal Travel", icon: "airplane",              route: "./travel",      desc: "Muslim-friendly trips" },
     ],
   },
   {
     title: "Makkah",
+    subtitle: "Sacred connections",
+    gridCols: 3,
     items: [
-      { label: "Makkah Live", icon: "video-outline", route: "./makkah_live", featured: true, desc: "Live Kaaba stream" },
+      { label: "Makkah Live", icon: "video-outline", route: "./makkah_live", featured: true, desc: "Live Kaaba stream", badge: "LIVE" },
     ],
   },
 ];
 
 /* ─────────────────────────────────────────
-   LAYOUT
+   LAYOUT CONSTANTS
 ───────────────────────────────────────── */
-const PAD  = rs(16);
-const GAP  = rs(10);
-const COLS = 3;
-const TILE = (W - PAD * 2 - GAP * (COLS - 1)) / COLS;
+const PAD = moderateScale(16);
+const GAP = scale(10);
 
 /* ─────────────────────────────────────────
-   SPRING
+   SPRING HELPER
 ───────────────────────────────────────── */
 const spring = (v: Animated.Value, to: number, speed = 40, bounce = 5) =>
   Animated.spring(v, { toValue: to, useNativeDriver: true, speed, bounciness: bounce });
 
 /* ─────────────────────────────────────────
-   GEOMETRIC ORNAMENT — Islamic star pattern
+   ISLAMIC GEOMETRIC ORNAMENT
 ───────────────────────────────────────── */
-const IslamicStar: React.FC<{ color: string; size?: number; filled?: boolean }> = ({
-  color, size = rs(14), filled = false,
+const StarOrnament: React.FC<{ color: string; size?: number; opacity?: number }> = ({
+  color, size = moderateScale(16), opacity = 1,
 }) => {
-  const s2 = size * 0.55;
+  const sq = size * 0.52;
   return (
-    <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
-      <View style={{
-        position: "absolute",
-        width: s2, height: s2,
-        borderWidth: filled ? 0 : 1.2,
-        borderColor: color,
-        backgroundColor: filled ? color + "40" : "transparent",
-      }} />
-      <View style={{
-        position: "absolute",
-        width: s2, height: s2,
-        borderWidth: filled ? 0 : 1.2,
-        borderColor: color,
-        backgroundColor: filled ? color + "40" : "transparent",
-        transform: [{ rotate: "45deg" }],
-      }} />
-      {filled && (
-        <View style={{
-          width: s2 * 0.35, height: s2 * 0.35,
-          borderRadius: s2 * 0.2,
-          backgroundColor: color,
-        }} />
-      )}
+    <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center", opacity }}>
+      <View style={{ position: "absolute", width: sq, height: sq, backgroundColor: color }} />
+      <View style={{ position: "absolute", width: sq, height: sq, backgroundColor: color, transform: [{ rotate: "45deg" }] }} />
     </View>
   );
 };
 
 /* ─────────────────────────────────────────
-   FEATURED CARD — wide cinematic layout
+   ARABESQUE BACKGROUND PATTERN
+───────────────────────────────────────── */
+const ArabesquePattern: React.FC<{ color: string }> = ({ color }) => (
+  <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+    {[0, 1, 2, 3].map(i => (
+      <View key={i} style={{
+        position: "absolute",
+        top: verticalScale(i * 55 - 20),
+        right: scale(i % 2 === 0 ? -15 : 30),
+        width: moderateScale(80), height: moderateScale(80),
+        borderRadius: moderateScale(4),
+        borderWidth: 1,
+        borderColor: color,
+        transform: [{ rotate: `${45 + i * 22.5}deg` }],
+        opacity: 0.15 - i * 0.02,
+      }} />
+    ))}
+  </View>
+);
+
+/* ─────────────────────────────────────────
+   SECTION HEADER
+───────────────────────────────────────── */
+const SectionHeader: React.FC<{
+  title: string;
+  subtitle?: string;
+  count: number;
+  theme: ThemeType;
+}> = ({ title, subtitle, count, theme }) => (
+  <View style={sh.wrap}>
+    <LinearGradient
+      colors={[theme.gradient[0] + "22", theme.gradient[1] + "11", "transparent"]}
+      start={{ x: 0, y: 0.5 }}
+      end={{ x: 1, y: 0.5 }}
+      style={sh.gradient}
+    />
+    <View style={sh.left}>
+      <View style={[sh.iconCluster, { backgroundColor: theme.gradient[0] + "18", borderColor: theme.border }]}>
+        <StarOrnament color={theme.primary} size={moderateScale(10)} />
+      </View>
+      <View style={sh.textGroup}>
+        <Text style={[sh.title, { color: C.white }]}>{title.toUpperCase()}</Text>
+        {subtitle && <Text style={[sh.subtitle, { color: C.white + "CC" }]}>{subtitle}</Text>}
+      </View>
+    </View>
+    <View style={[sh.badge, { backgroundColor: theme.light, borderColor: theme.border }]}>
+      <Text style={[sh.badgeNum, { color: theme.gradient[0] }]}>{count}</Text>
+      <Text style={[sh.badgeLabel, { color: theme.gradient[0] }]}> features</Text>
+    </View>
+  </View>
+);
+
+/* ─────────────────────────────────────────
+   FEATURED CARD
 ───────────────────────────────────────── */
 const FeaturedCard: React.FC<{
   item:    FeatureItem;
   theme:   ThemeType;
   onPress: () => void;
 }> = ({ item, theme, onPress }) => {
-  const scale = useRef(new Animated.Value(1)).current;
-  const glow  = useRef(new Animated.Value(0)).current;
-
-  const pressIn  = () => {
-    spring(scale, 0.968, 60, 0).start();
-    Animated.timing(glow, { toValue: 1, duration: 150, useNativeDriver: true }).start();
-  };
-  const pressOut = () => {
-    spring(scale, 1, 28, 8).start();
-    Animated.timing(glow, { toValue: 0, duration: 200, useNativeDriver: true }).start();
-  };
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const glow      = useRef(new Animated.Value(0)).current;
 
   return (
-    <Animated.View style={[fs.wrap, { transform: [{ scale }] }]}>
+    <Animated.View style={[fc.outer, { transform: [{ scale: scaleAnim }] }]}>
       <TouchableOpacity
         activeOpacity={1}
         onPress={onPress}
-        onPressIn={pressIn}
-        onPressOut={pressOut}
-        style={fs.touch}
+        onPressIn={() => {
+          spring(scaleAnim, 0.972, 60, 0).start();
+          Animated.timing(glow, { toValue: 1, duration: 120, useNativeDriver: false }).start();
+        }}
+        onPressOut={() => {
+          spring(scaleAnim, 1, 28, 9).start();
+          Animated.timing(glow, { toValue: 0, duration: 200, useNativeDriver: false }).start();
+        }}
+        style={fc.touchable}
       >
-        {/* Deep gradient */}
         <LinearGradient
-          colors={[theme.gradA + "EE", theme.gradA + "88", theme.gradB, C.cardDeep]}
-          start={{ x: 0.1, y: 0 }} end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
+          colors={[theme.gradient[0], theme.gradient[1], theme.gradient[0] + "CC"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
         />
-        {/* Top shimmer line */}
-        <LinearGradient
-          colors={["transparent", theme.accent + "BB", theme.accentSoft, theme.accent + "BB", "transparent"]}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-          style={fs.shimmer}
-        />
-        {/* Radial glow blob */}
-        <Animated.View style={[fs.glowBlob, {
-          backgroundColor: theme.accent + "20",
-          opacity: glow.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }),
+        <ArabesquePattern color={C.white} />
+        <Animated.View style={[fc.glowRing, {
+          borderColor: C.white,
+          opacity: glow.interpolate({ inputRange: [0, 1], outputRange: [0, 0.25] }),
         }]} />
-        {/* Concentric rings */}
-        <View style={[fs.ringOuter, { borderColor: theme.accent + "0E" }]} />
-        <View style={[fs.ringInner, { borderColor: theme.accent + "16" }]} />
-        {/* Glass border */}
-        <View style={[StyleSheet.absoluteFill, fs.border, { borderColor: theme.border }]} />
-
-        <View style={fs.content}>
-          {/* Left column */}
-          <View style={fs.left}>
-            <View style={[fs.badge, { backgroundColor: theme.accentDim, borderColor: theme.border }]}>
-              <IslamicStar color={theme.accent} size={rs(8)} filled />
-              <Text style={[fs.badgeTxt, { color: theme.accent }]}>FEATURED</Text>
-            </View>
-            <Text style={fs.title}>{item.label}</Text>
-            {item.desc && (
-              <Text style={[fs.desc, { color: theme.accentSoft + "BB" }]}>{item.desc}</Text>
-            )}
-            <TouchableOpacity
-              onPress={onPress}
-              style={[fs.cta, { borderColor: theme.border, backgroundColor: theme.accentDim }]}
-            >
-              <Text style={[fs.ctaTxt, { color: theme.accentSoft }]}>Open</Text>
-              <View style={[fs.ctaArrow, { backgroundColor: theme.accent }]}>
-                <Feather name="arrow-right" size={rs(10)} color={C.cardDeep} />
-              </View>
-            </TouchableOpacity>
+        {item.badge && (
+          <View style={[fc.livePill, { backgroundColor: C.white + "22" }]}>
+            {item.badge === "LIVE" && <View style={fc.liveDot} />}
+            <Text style={fc.liveText}>{item.badge}</Text>
           </View>
-
-          {/* Icon orb */}
-          <View style={fs.orbArea}>
-            <View style={[fs.orbRing2, { borderColor: theme.border + "80" }]} />
-            <View style={[fs.orbRing1, { borderColor: theme.border }]}>
-              <View style={[fs.orb, { backgroundColor: theme.iconBg }]}>
-                <MaterialCommunityIcons name={item.icon} size={rs(38)} color={theme.accent} />
+        )}
+        <View style={fc.content}>
+          <View style={fc.left}>
+            <Text style={fc.label}>{item.label}</Text>
+            {item.desc && <Text style={fc.desc}>{item.desc}</Text>}
+            <View style={[fc.cta, { backgroundColor: C.white + "20" }]}>
+              <Text style={fc.ctaText}>Open</Text>
+              <View style={[fc.ctaArrow, { backgroundColor: C.white + "30" }]}>
+                <Feather name="arrow-right" size={moderateScale(11)} color={C.white} />
+              </View>
+            </View>
+          </View>
+          <View style={fc.orbWrap}>
+            <View style={[fc.orbOuter, { borderColor: C.white + "25" }]}>
+              <View style={[fc.orbInner, { backgroundColor: C.white + "18" }]}>
+                <MaterialCommunityIcons name={item.icon} size={moderateScale(42)} color={C.white} />
               </View>
             </View>
           </View>
@@ -286,63 +336,51 @@ const FeaturedCard: React.FC<{
 };
 
 /* ─────────────────────────────────────────
-   STANDARD TILE — 3-column grid
+   STANDARD TILE
 ───────────────────────────────────────── */
 const FeatureTile: React.FC<{
-  item:    FeatureItem;
-  idx:     number;
-  theme:   ThemeType;
-  onPress: () => void;
-}> = ({ item, idx, theme, onPress }) => {
-  const scale  = useRef(new Animated.Value(1)).current;
-  const bright = useRef(new Animated.Value(1)).current;
-  const col = idx % COLS;
-  const ml  = col > 0 ? GAP : 0;
+  item:      FeatureItem;
+  idx:       number;
+  cols:      number;
+  tileWidth: number;
+  theme:     ThemeType;
+  onPress:   () => void;
+}> = ({ item, idx, cols, tileWidth, theme, onPress }) => {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const bright    = useRef(new Animated.Value(1)).current;
+  const ml = idx % cols > 0 ? GAP : 0;
 
   return (
-    <Animated.View style={[ts.wrap, {
-      width: TILE,
-      marginLeft: ml,
-      transform: [{ scale }],
-      opacity: bright,
-    }]}>
+    <Animated.View style={[tt.wrap, { width: tileWidth, marginLeft: ml, transform: [{ scale: scaleAnim }], opacity: bright }]}>
       <TouchableOpacity
         activeOpacity={1}
         onPress={onPress}
         onPressIn={() => {
-          spring(scale, 0.92, 70, 0).start();
-          Animated.timing(bright, { toValue: 0.75, duration: 80, useNativeDriver: true }).start();
+          spring(scaleAnim, 0.91, 70, 0).start();
+          Animated.timing(bright, { toValue: 0.78, duration: 70, useNativeDriver: true }).start();
         }}
         onPressOut={() => {
-          spring(scale, 1, 30, 7).start();
-          Animated.timing(bright, { toValue: 1, duration: 140, useNativeDriver: true }).start();
+          spring(scaleAnim, 1, 32, 8).start();
+          Animated.timing(bright, { toValue: 1, duration: 150, useNativeDriver: true }).start();
         }}
-        style={ts.card}
+        style={[tt.card, { borderColor: theme.border, backgroundColor: theme.cardBg }]}
       >
         <LinearGradient
-          colors={[theme.glowColor, "transparent"]}
-          start={{ x: 0.3, y: 0 }} end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
+          colors={[theme.gradient[0], theme.gradient[1]]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={tt.stripe}
         />
-        {/* Accent notch */}
-        <View style={[ts.notch, { backgroundColor: theme.accent }]} />
-        {/* Glass border */}
-        <View style={[StyleSheet.absoluteFill, ts.border, { borderColor: theme.border }]} />
-
- {/* Icon — centered, larger */}
-        <View style={ts.iconWrap}>
-          <View style={[ts.iconRing, { borderColor: theme.accent + "30" }]}>
-            <View style={[ts.iconBg, { backgroundColor: theme.iconBg }]}>
-              <MaterialCommunityIcons name={item.icon} size={rs(30)} color={theme.accent} />
-            </View>
+        {item.badge && (
+          <View style={[tt.badge, { backgroundColor: theme.light }]}>
+            <Text style={[tt.badgeTxt, { color: theme.gradient[0] }]}>{item.badge}</Text>
           </View>
+        )}
+        <View style={[tt.iconBg, { backgroundColor: theme.light }]}>
+          <MaterialCommunityIcons name={item.icon} size={moderateScale(35)} color={theme.primary} />
         </View>
-
-        {/* Label — centered, larger */}
-        <Text style={ts.label} numberOfLines={2}>{item.label}</Text>
+        <Text style={[tt.label, { color: C.ink }]} numberOfLines={2}>{item.label}</Text>
       </TouchableOpacity>
-
-
     </Animated.View>
   );
 };
@@ -354,41 +392,27 @@ const SectionBlock: React.FC<{
   section: FeatureSection;
   onPress: (route: string) => void;
 }> = ({ section, onPress }) => {
-  const theme    = SECTION_THEME[section.title as SectionKey] ?? SECTION_THEME.Utility;
+  const theme    = THEMES[section.title as SectionKey] ?? THEMES.Utility;
   const featured = section.items.filter(i => i.featured);
   const standard = section.items.filter(i => !i.featured);
+  
+  // Dynamic columns based on device: give tablets +1 column naturally 
+  const cols = isTablet ? (section.gridCols === 2 ? 3 : 4) : (section.gridCols || 3);
+  
+  // Tile width calculation uses the centered content wrapper width, not full device width
+  const tileW = (ACTUAL_CONTENT_WIDTH - (PAD * 2) - (GAP * (cols - 1))) / cols;
 
   const rows: FeatureItem[][] = [];
-  for (let i = 0; i < standard.length; i += COLS) {
-    rows.push(standard.slice(i, i + COLS));
-  }
+  for (let i = 0; i < standard.length; i += cols) rows.push(standard.slice(i, i + cols));
 
   return (
-    <View style={sec.block}>
-      {/* Section header */}
-      <View style={sec.headerRow}>
-        <IslamicStar color={theme.accent} size={rs(12)} filled />
-        <Text style={[sec.title, { color: theme.accent }]}>{section.title.toUpperCase()}</Text>
-        <View style={[sec.rule, { backgroundColor: theme.accent + "25" }]} />
-        <View style={[sec.pill, { backgroundColor: theme.accentDim, borderColor: theme.border }]}>
-          <Text style={[sec.pillTxt, { color: theme.accentSoft }]}>{section.items.length}</Text>
-        </View>
-      </View>
-
-      {featured.map(item => (
-        <FeaturedCard key={item.route} item={item} theme={theme} onPress={() => onPress(item.route)} />
-      ))}
-
+    <View style={sb.block}>
+      <SectionHeader title={section.title} subtitle={section.subtitle} count={section.items.length} theme={theme} />
+      {featured.map(item => <FeaturedCard key={item.route} item={item} theme={theme} onPress={() => onPress(item.route)} />)}
       {rows.map((row, ri) => (
-        <View key={ri} style={sec.row}>
+        <View key={ri} style={sb.row}>
           {row.map((item, ci) => (
-            <FeatureTile
-              key={item.route}
-              item={item}
-              idx={ci}
-              theme={theme}
-              onPress={() => onPress(item.route)}
-            />
+            <FeatureTile key={item.route} item={item} idx={ci} cols={cols} tileWidth={tileW} theme={theme} onPress={() => onPress(item.route)} />
           ))}
         </View>
       ))}
@@ -397,163 +421,194 @@ const SectionBlock: React.FC<{
 };
 
 /* ─────────────────────────────────────────
-   MAIN SCREEN
+   SEARCH BAR
+───────────────────────────────────────── */
+const SearchBar: React.FC<{
+  query:    string;
+  focused:  boolean;
+  onChange: (v: string) => void;
+  onFocus:  () => void;
+  onBlur:   () => void;
+}> = ({ query, focused, onChange, onFocus, onBlur }) => {
+  const bar = useRef(new Animated.Value(0)).current;
+
+  const focusIn  = () => Animated.spring(bar, { toValue: 1, useNativeDriver: false, speed: 25, bounciness: 4 }).start();
+  const focusOut = () => Animated.spring(bar, { toValue: 0, useNativeDriver: false, speed: 25, bounciness: 4 }).start();
+
+  const borderColor = bar.interpolate({ inputRange: [0, 1], outputRange: [C.whiteGhost, C.tealLt + "80"] });
+
+  return (
+    <Animated.View style={[srch.wrap, { borderColor }]}>
+      <Feather name="search" size={moderateScale(17)} color={focused ? C.tealLt : C.white + "60"} />
+      <TextInput
+        placeholder="Search all features…"
+        placeholderTextColor={C.white + "80"}
+        style={srch.input}
+        value={query}
+        onChangeText={onChange}
+        onFocus={() => { onFocus(); focusIn(); }}
+        onBlur={() => { onBlur(); focusOut(); }}
+        returnKeyType="search"
+        clearButtonMode="while-editing"
+        underlineColorAndroid="transparent"
+        selectionColor={C.goldBright}
+      />
+      {query.length > 0 && Platform.OS === "android" && (
+        <TouchableOpacity onPress={() => onChange("")} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <View style={srch.clearBtn}>
+            <Feather name="x" size={moderateScale(12)} color={C.white} />
+          </View>
+        </TouchableOpacity>
+      )}
+    </Animated.View>
+  );
+};
+
+/* ─────────────────────────────────────────
+   CATEGORY PILLS ROW
+───────────────────────────────────────── */
+const CategoryPills: React.FC<{ onPress: (t: string) => void; active?: string }> = ({ onPress, active }) => (
+  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={pills.row}>
+    {Object.entries(THEMES).map(([key, theme]) => {
+      const isActive = active === key;
+      return (
+        <TouchableOpacity key={key} onPress={() => onPress(key)} activeOpacity={0.8}>
+          <LinearGradient
+            colors={isActive ? theme.gradient : [C.whiteGhost, C.whiteGhost]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={[pills.pill, isActive && pills.pillActive]}
+          >
+            <StarOrnament color={isActive ? C.white : theme.primary} size={moderateScale(8)} />
+            <Text style={[pills.txt, { color: isActive ? C.white : C.white + "CC" }]}>{key}</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      );
+    })}
+  </ScrollView>
+);
+
+/* ─────────────────────────────────────────
+   STAT BADGE ROW
+───────────────────────────────────────── */
+const StatRow: React.FC = () => {
+  const total = FEATURE_SECTIONS.reduce((n, s) => n + s.items.length, 0);
+  const cats  = FEATURE_SECTIONS.length;
+  return (
+    <View style={stat.row}>
+      <View style={stat.item}>
+        <Text style={stat.num}>{total}</Text>
+        <Text style={stat.lbl}>Features</Text>
+      </View>
+      <View style={stat.divider} />
+      <View style={stat.item}>
+        <Text style={stat.num}>{cats}</Text>
+        <Text style={stat.lbl}>Categories</Text>
+      </View>
+      <View style={stat.divider} />
+      <View style={stat.item}>
+        <View style={stat.liveDot} />
+        <Text style={stat.lbl}>All Active</Text>
+      </View>
+    </View>
+  );
+};
+
+/* ─────────────────────────────────────────
+   MAIN SCREEN 
 ───────────────────────────────────────── */
 export default function IslamicFeaturesScreen() {
   const router = useRouter();
-  const [query, setQuery]           = useState("");
-  const [searchFocused, setFocused] = useState(false);
+  const insets = useSafeAreaInsets(); 
+
+  const [query,   setQuery]   = useState("");
+  const [focused, setFocused] = useState(false);
   const scrollY = useRef(new Animated.Value(0)).current;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return FEATURE_SECTIONS;
     return FEATURE_SECTIONS
-      .map(s => ({ ...s, items: s.items.filter(i => i.label.toLowerCase().includes(q)) }))
+      .map(s => ({ ...s, items: s.items.filter(i => i.label.toLowerCase().includes(q) || (i.desc ?? "").toLowerCase().includes(q)) }))
       .filter(s => s.items.length > 0);
   }, [query]);
 
   const navigate = (route: string) => router.push(route as any);
 
-  const headerTranslate = scrollY.interpolate({
-    inputRange: [0, rs(100)],
-    outputRange: [0, -rs(12)],
-    extrapolate: "clamp",
-  });
-  const headerOpacity = scrollY.interpolate({
-    inputRange: [0, rs(80)],
-    outputRange: [1, 0.9],
-    extrapolate: "clamp",
-  });
+  const headerO = scrollY.interpolate({ inputRange: [0, verticalScale(80)], outputRange: [1, 0.95], extrapolate: "clamp" });
 
   return (
-    <SafeAreaView style={root.safe} edges={["top", "left", "right"]}>
+    <View style={root.safe}>
+      {/* GLOBAL STATUS BAR LOCK */}
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      {/* Background mesh */}
-      <View style={root.bgMesh}>
-        <LinearGradient
-          colors={["#0B2020", "#060E0E", "#040B0B"]}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
-        <View style={root.blob1} />
-        <View style={root.blob2} />
-        <View style={root.blob3} />
+      <LinearGradient
+        colors={[C.bgDeep, C.bg, C.bgMid + "EE"]}
+        style={StyleSheet.absoluteFillObject}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0.3, y: 1 }}
+      />
+      
+      <View style={root.meshWrap} pointerEvents="none">
+        {[0, 1, 2].map(i => (
+          <View key={i} style={[root.meshCircle, {
+            width: moderateScale(180 + i * 60), height: moderateScale(180 + i * 60),
+            top:  verticalScale(-40 + i * 110),
+            right: scale(-60 + i * 20),
+            borderRadius: moderateScale((180 + i * 60) / 2),
+            borderColor: C.white + (i === 0 ? "0A" : i === 1 ? "07" : "05"),
+          }]} />
+        ))}
       </View>
 
-      {/* ════ HEADER ════ */}
-      <Animated.View style={[root.header, {
-        transform: [{ translateY: headerTranslate }],
-        opacity: headerOpacity,
-      }]}>
-        <LinearGradient
-          colors={["#0E3030", "#0A2424", "#081A1A"]}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
-        <View style={root.hRing1} />
-        <View style={root.hRing2} />
-        <LinearGradient
-          colors={["transparent", C.teal + "14", "transparent"]}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-          style={root.hShimmer}
-        />
-
-        {/* Nav row */}
+      {/* FIXED HEADER WITH INSETS APPLIED */}
+      <Animated.View style={[root.header, { paddingTop: insets.top + verticalScale(8), opacity: headerO }]}>
         <View style={root.navRow}>
           <TouchableOpacity
             style={root.backBtn}
             onPress={() => router.back()}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <LinearGradient
-              colors={[C.tealDim + "CC", C.tealDim]}
-              style={[StyleSheet.absoluteFill, { borderRadius: rs(14) }]}
-            />
-            <View style={[StyleSheet.absoluteFill, root.backBorder]} />
-            <Feather name="chevron-left" size={rs(18)} color={C.tealSoft} />
+            <Feather name="arrow-left" size={moderateScale(19)} color={C.white} />
           </TouchableOpacity>
 
-          <View style={root.titleGroup}>
-            <IslamicStar color={C.gold + "80"} size={rs(11)} />
-            <Text style={root.navTitle}>Features</Text>
-            <IslamicStar color={C.gold + "80"} size={rs(11)} />
+          <View style={root.titleArea}>
+            <StarOrnament color={C.goldBright} size={moderateScale(10)} opacity={0.8} />
+            <Text style={root.title}>Features</Text>
+            <StarOrnament color={C.goldBright} size={moderateScale(10)} opacity={0.8} />
           </View>
 
-          {/* Total count badge */}
-          <View style={root.countBadge}>
-            <LinearGradient
-              colors={[C.goldGlow + "CC", C.goldGlow]}
-              style={[StyleSheet.absoluteFill, { borderRadius: rs(12) }]}
-            />
-            <View style={[StyleSheet.absoluteFill, root.countBorder]} />
-            <Text style={root.countTxt}>
+          <View style={[root.totalBadge, { backgroundColor: C.gold }]}>
+            <Text style={root.totalNum}>
               {FEATURE_SECTIONS.reduce((n, s) => n + s.items.length, 0)}
             </Text>
           </View>
         </View>
 
-        {/* Category pills */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={root.pillsRow}
-          style={{ marginBottom: rs(14) }}
-        >
-          {FEATURE_SECTIONS.map(s => {
-            const t = SECTION_THEME[s.title as SectionKey];
-            return (
-              <View key={s.title} style={[root.categoryPill, {
-                backgroundColor: t.accentDim,
-                borderColor: t.border,
-              }]}>
-                <View style={[root.pillDot, { backgroundColor: t.accent }]} />
-                <Text style={[root.pillTxt, { color: t.accentSoft }]}>{s.title}</Text>
-                <Text style={[root.pillCount, { color: t.accent }]}>{s.items.length}</Text>
-              </View>
-            );
-          })}
-        </ScrollView>
+        {/* Center alignment wrapper for tablet screens for inner header content */}
+        <View style={root.tabletHeaderWrapper}>
+          <View style={root.goldRule}>
+            <View style={[root.ruleLine, { backgroundColor: C.goldBright + "30" }]} />
+            <StarOrnament color={C.goldBright} size={moderateScale(8)} opacity={0.6} />
+            <View style={[root.ruleLine, { backgroundColor: C.goldBright + "30" }]} />
+          </View>
 
-        {/* Search bar */}
-        <View style={[root.search, searchFocused && {
-          borderColor: C.teal + "60",
-          backgroundColor: "#0A1E1E",
-        }]}>
-          <Feather name="search" size={rs(14)} color={searchFocused ? C.teal : C.inkDim} />
-          <TextInput
-            placeholder="Search features…"
-            placeholderTextColor={C.inkFaint}
-            style={root.searchInput}
-            value={query}
-            onChangeText={setQuery}
+          <StatRow />
+          <CategoryPills onPress={() => {}} />
+
+          <SearchBar
+            query={query}
+            focused={focused}
+            onChange={setQuery}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
-            returnKeyType="search"
-            clearButtonMode="while-editing"
-            underlineColorAndroid="transparent"
-            selectionColor={C.teal}
           />
-          {query.length > 0 && Platform.OS === "android" && (
-            <TouchableOpacity onPress={() => setQuery("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <View style={root.clearX}>
-                <Feather name="x" size={rs(10)} color={C.inkMid} />
-              </View>
-            </TouchableOpacity>
-          )}
         </View>
       </Animated.View>
 
-      {/* Tri-color divider */}
-      <LinearGradient
-        colors={[C.teal + "70", C.gold + "40", C.coral + "25", "transparent"]}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-        style={{ height: rs(1.5) }}
-      />
+      <View style={{ height: 1, backgroundColor: C.white + "12" }} />
 
-      {/* ════ SCROLL ════ */}
       <Animated.ScrollView
-        contentContainerStyle={root.scroll}
+        contentContainerStyle={root.scrollContent}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         onScroll={Animated.event(
@@ -562,271 +617,306 @@ export default function IslamicFeaturesScreen() {
         )}
         scrollEventThrottle={16}
       >
-        {filtered.length === 0 ? (
-          <View style={root.empty}>
-            <View style={root.emptyOrb}>
-              <IslamicStar color={C.teal + "55"} size={rs(40)} />
+        {/* Tablet Centering Main Wrapper */}
+        <View style={root.tabletContentWrapper}>
+          {filtered.length === 0 ? (
+            <View style={root.empty}>
+              <View style={[root.emptyOrb, { backgroundColor: C.whiteGhost, borderColor: C.white + "15" }]}>
+                <Feather name="search" size={moderateScale(32)} color={C.tealLt} />
+              </View>
+              <Text style={[root.emptyTitle, { color: C.white }]}>Nothing found</Text>
+              <Text style={[root.emptyHint, { color: C.tealLt }]}>No results for "{query}"</Text>
             </View>
-            <Text style={root.emptyTitle}>Nothing found</Text>
-            <Text style={root.emptyHint}>No results for "{query}"</Text>
-          </View>
-        ) : (
-          filtered.map(s => (
-            <SectionBlock key={s.title} section={s} onPress={navigate} />
-          ))
-        )}
-        <View style={{ height: rs(80) }} />
+          ) : (
+            filtered.map(s => (
+              <SectionBlock key={s.title} section={s} onPress={navigate} />
+            ))
+          )}
+          <View style={{ height: verticalScale(100) }} />
+        </View>
       </Animated.ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 /* ─────────────────────────────────────────
-   STYLES
+   SHADOWS
 ───────────────────────────────────────── */
-const TILE_H = TILE * 1.08;
-
-const shadowMd = Platform.select({
-  ios:     { shadowColor: C.shadow, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.55, shadowRadius: 12 },
-  android: { elevation: 7 },
+const softShadow = Platform.select({
+  ios:     { shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 8 },
+  android: { elevation: 3 },
 });
-const shadowLg = Platform.select({
-  ios:     { shadowColor: C.shadow, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.65, shadowRadius: 20 },
-  android: { elevation: 13 },
+const strongShadow = Platform.select({
+  ios:     { shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 18 },
+  android: { elevation: 8 },
 });
 
+/* ─────────────────────────────────────────
+   ROOT STYLES
+───────────────────────────────────────── */
 const root = StyleSheet.create({
-  safe:    { flex: 1, backgroundColor: C.bg },
-  bgMesh:  { ...StyleSheet.absoluteFillObject },
-  blob1: {
-    position: "absolute", top: -rs(60), left: -rs(60),
-    width: rs(280), height: rs(280), borderRadius: rs(140),
-    backgroundColor: "rgba(47,217,200,0.04)",
-  },
-  blob2: {
-    position: "absolute", top: rs(300), right: -rs(80),
-    width: rs(220), height: rs(220), borderRadius: rs(110),
-    backgroundColor: "rgba(232,184,75,0.03)",
-  },
-  blob3: {
-    position: "absolute", bottom: rs(100), left: -rs(40),
-    width: rs(180), height: rs(180), borderRadius: rs(90),
-    backgroundColor: "rgba(224,114,101,0.03)",
-  },
+  safe:        { flex: 1, backgroundColor: C.bgDeep },
+  meshWrap:    { ...StyleSheet.absoluteFillObject, overflow: "hidden" },
+  meshCircle:  { position: "absolute", borderWidth: 1 },
+  
   header: {
-    paddingHorizontal: PAD,
-    paddingBottom: rs(18),
-    overflow: "hidden",
+    paddingHorizontal: wp('4.5%'),
+    paddingBottom:     verticalScale(14),
+    zIndex:            10,
+    overflow:          "visible", 
   },
-  hRing1: {
-    position: "absolute", top: -rs(70), right: -rs(70),
-    width: rs(220), height: rs(220), borderRadius: rs(110),
-    borderWidth: 1, borderColor: "rgba(47,217,200,0.07)",
+  tabletHeaderWrapper: {
+    width: '100%',
+    maxWidth: CONTENT_MAX_WIDTH,
+    alignSelf: 'center',
   },
-  hRing2: {
-    position: "absolute", top: -rs(35), right: -rs(35),
-    width: rs(120), height: rs(120), borderRadius: rs(60),
-    borderWidth: 1, borderColor: "rgba(232,184,75,0.09)",
-  },
-  hShimmer: {
-    position: "absolute", bottom: 0, left: 0, right: 0, height: rs(1),
-  },
+  
   navRow: {
     flexDirection: "row", alignItems: "center",
     justifyContent: "space-between",
-    marginTop: rs(8), marginBottom: rs(16),
+    marginBottom: verticalScale(14),
   },
   backBtn: {
-    width: rs(42), height: rs(42), borderRadius: rs(14),
+    width: moderateScale(40), height: moderateScale(40), borderRadius: moderateScale(20),
+    backgroundColor: C.whiteGhost,
+    borderWidth: 1, borderColor: C.white + "15",
     alignItems: "center", justifyContent: "center",
-    overflow: "hidden",
   },
-  backBorder: {
-    borderRadius: rs(14), borderWidth: 1,
-    borderColor: "rgba(47,217,200,0.22)",
+  titleArea: {
+    flexDirection: "row", alignItems: "center", gap: scale(10),
   },
-  titleGroup: {
-    flexDirection: "row", alignItems: "center", gap: rs(10),
+  title: {
+    fontSize: fontScale(26), fontWeight: "800",
+    color: C.white, letterSpacing: -0.5,
   },
-  navTitle: {
-    fontSize: rs(28), fontWeight: "800",
-    color: C.ink, letterSpacing: -0.5,
+  totalBadge: {
+    paddingHorizontal: scale(12), paddingVertical: verticalScale(7),
+    borderRadius: moderateScale(14), alignItems: "center", justifyContent: "center",
   },
-  countBadge: {
-    width: rs(42), height: rs(42), borderRadius: rs(12),
-    alignItems: "center", justifyContent: "center",
-    overflow: "hidden",
-  },
-  countBorder: {
-    borderRadius: rs(12), borderWidth: 1.5,
-    borderColor: "rgba(232,184,75,0.30)",
-  },
-  countTxt: {
-    fontSize: rs(13), fontWeight: "900", color: C.gold,
-  },
-  pillsRow: {
-    paddingRight: PAD, gap: rs(8), flexDirection: "row",
-  },
-  categoryPill: {
+  totalNum: { fontSize: fontScale(13), fontWeight: "800", color: C.white },
+  
+  goldRule: {
     flexDirection: "row", alignItems: "center",
-    borderRadius: rs(30), borderWidth: 1,
-    paddingHorizontal: rs(12), paddingVertical: rs(6), gap: rs(6),
+    gap: scale(8), marginBottom: verticalScale(12),
   },
-  pillDot:   { width: rs(6), height: rs(6), borderRadius: rs(3) },
-  pillTxt:   { fontSize: rs(11), fontWeight: "700", letterSpacing: 0.3 },
-  pillCount: { fontSize: rs(10), fontWeight: "900", marginLeft: rs(2) },
-  search: {
+  ruleLine: { flex: 1, height: 1 },
+  
+  scrollContent: { paddingHorizontal: PAD, paddingTop: verticalScale(14) },
+  tabletContentWrapper: {
+    width: '100%',
+    maxWidth: CONTENT_MAX_WIDTH,
+    alignSelf: 'center',
+  },
+  
+  empty: {
+    alignItems: "center", paddingTop: verticalScale(80), gap: verticalScale(16),
+  },
+  emptyOrb: {
+    width: moderateScale(80), height: moderateScale(80), borderRadius: moderateScale(40),
+    borderWidth: 1, alignItems: "center", justifyContent: "center",
+  },
+  emptyTitle: { fontSize: fontScale(20), fontWeight: "800", letterSpacing: -0.2 },
+  emptyHint:  { fontSize: fontScale(14), fontWeight: "500" },
+});
+
+/* ─────────────────────────────────────────
+   STAT ROW STYLES
+───────────────────────────────────────── */
+const stat = StyleSheet.create({
+  row: {
     flexDirection: "row", alignItems: "center",
-    backgroundColor: "#081616",
-    borderWidth: 1.5, borderColor: "rgba(47,217,200,0.18)",
-    borderRadius: rs(16), paddingHorizontal: rs(14), height: rs(46),
-    ...Platform.select({
-      ios:     { shadowColor: C.shadow, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.50, shadowRadius: 8 },
-      android: { elevation: 5 },
-    }),
+    backgroundColor: C.whiteGhost,
+    borderRadius: moderateScale(16), borderWidth: 1, borderColor: C.white + "10",
+    paddingVertical: verticalScale(10), paddingHorizontal: scale(20),
+    marginBottom: verticalScale(14), gap: 0,
   },
-  searchInput: {
-    flex: 1, color: C.ink, fontSize: rs(14),
-    fontWeight: "500", marginLeft: rs(10), paddingVertical: 0,
+  item: {
+    flex: 1, alignItems: "center",
+    flexDirection: "row", justifyContent: "center", gap: scale(6),
+  },
+  num:  { fontSize: fontScale(16), fontWeight: "800", color: C.white },
+  lbl:  { fontSize: fontScale(11), color: C.tealLt, fontWeight: "600" },
+  divider: { width: 1, height: verticalScale(22), backgroundColor: C.white + "15" },
+  liveDot: {
+    width: moderateScale(7), height: moderateScale(7), borderRadius: moderateScale(4),
+    backgroundColor: "#4ADE80",
+  },
+});
+
+/* ─────────────────────────────────────────
+   PILLS STYLES
+───────────────────────────────────────── */
+const pills = StyleSheet.create({
+  row: {
+    paddingRight: PAD, gap: scale(8),
+    flexDirection: "row", marginBottom: verticalScale(14),
+  },
+  pill: {
+    flexDirection: "row", alignItems: "center", gap: scale(6),
+    borderRadius: moderateScale(20), borderWidth: 1, borderColor: C.white + "15",
+    paddingHorizontal: scale(14), paddingVertical: verticalScale(8),
+  },
+  pillActive: {
+    borderColor: "transparent",
+  },
+  txt: { fontSize: fontScale(12), fontWeight: "700" },
+});
+
+/* ─────────────────────────────────────────
+   SEARCH STYLES
+───────────────────────────────────────── */
+const srch = StyleSheet.create({
+  wrap: {
+    flexDirection: "row", alignItems: "center",
+    backgroundColor: C.whiteGhost,
+    borderWidth: 1.5,
+    borderRadius: moderateScale(16), paddingHorizontal: scale(14), height: verticalScale(50),
+  },
+  input: {
+    flex: 1, color: C.white, fontSize: fontScale(15),
+    fontWeight: "500", marginLeft: scale(10), paddingVertical: 0,
     ...Platform.select({
       android: { includeFontPadding: false, textAlignVertical: "center" as const },
     }),
   },
-  clearX: {
-    width: rs(22), height: rs(22), borderRadius: rs(11),
-    backgroundColor: "rgba(47,217,200,0.12)",
+  clearBtn: {
+    width: moderateScale(24), height: moderateScale(24), borderRadius: moderateScale(12),
+    backgroundColor: C.white + "20",
     alignItems: "center", justifyContent: "center",
   },
-  scroll: { paddingHorizontal: PAD, paddingTop: rs(20) },
-  empty: { alignItems: "center", paddingTop: rs(100), gap: rs(16) },
-  emptyOrb: {
-    width: rs(96), height: rs(96), borderRadius: rs(48),
-    backgroundColor: "rgba(47,217,200,0.07)",
-    borderWidth: 1, borderColor: "rgba(47,217,200,0.18)",
-    alignItems: "center", justifyContent: "center",
-  },
-  emptyTitle: {
-    fontSize: rs(20), fontWeight: "800", color: C.inkMid, letterSpacing: -0.2,
-  },
-  emptyHint: { fontSize: rs(13), color: C.inkDim, fontWeight: "500" },
 });
 
-const sec = StyleSheet.create({
-  block: { marginBottom: rs(30) },
-  headerRow: {
+/* ─────────────────────────────────────────
+   SECTION HEADER STYLES
+───────────────────────────────────────── */
+const sh = StyleSheet.create({
+  wrap: {
     flexDirection: "row", alignItems: "center",
-    gap: rs(8), marginBottom: rs(14),
+    justifyContent: "space-between",
+    marginBottom: verticalScale(14), paddingVertical: verticalScale(10),
+    paddingHorizontal: scale(12), borderRadius: moderateScale(14),
+    overflow: "hidden", position: "relative",
+    backgroundColor: C.surface + "08",
+    borderWidth: 1, borderColor: C.white + "10",
   },
-  title: { fontSize: rs(10), fontWeight: "900", letterSpacing: 2.8 },
-  rule:  { flex: 1, height: 1.2, borderRadius: 1 },
-  pill: {
-    borderRadius: rs(8), borderWidth: 1,
-    paddingHorizontal: rs(8), paddingVertical: rs(2),
+  gradient: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: moderateScale(14),
   },
-  pillTxt: { fontSize: rs(11), fontWeight: "900" },
-  row: {
-    flexDirection: "row",
-    marginBottom: rs(10),
-    alignItems: "stretch",
+  left: {
+    flexDirection: "row", alignItems: "center", gap: scale(10),
   },
+  iconCluster: {
+    width: moderateScale(32), height: moderateScale(32), borderRadius: moderateScale(10),
+    borderWidth: 1, alignItems: "center", justifyContent: "center",
+  },
+  textGroup: { gap: verticalScale(1) },
+  title: {
+    fontSize: fontScale(12), fontWeight: "800", letterSpacing: 2,
+  },
+  subtitle: {
+    fontSize: fontScale(10), fontWeight: "600", letterSpacing: 0.5,
+    opacity: 0.8,
+  },
+  badge: {
+    flexDirection: "row", alignItems: "center",
+    borderRadius: moderateScale(10), borderWidth: 1,
+    paddingHorizontal: scale(10), paddingVertical: verticalScale(5),
+  },
+  badgeNum:   { fontSize: fontScale(14), fontWeight: "800" },
+  badgeLabel: { fontSize: fontScale(10), fontWeight: "600" },
 });
 
-const fs = StyleSheet.create({
-  wrap:  { marginBottom: rs(14), borderRadius: rs(22), ...shadowLg },
-  touch: { height: rs(138), borderRadius: rs(22), overflow: "hidden" },
-  shimmer: {
-    position: "absolute", top: 0, left: 0, right: 0, height: rs(2),
+/* ─────────────────────────────────────────
+   FEATURED CARD STYLES
+───────────────────────────────────────── */
+const fc = StyleSheet.create({
+  outer: {
+    borderRadius: moderateScale(22), marginBottom: verticalScale(14),
+    overflow: "hidden", ...strongShadow,
   },
-  glowBlob: {
-    position: "absolute", top: rs(10), right: rs(16),
-    width: rs(100), height: rs(100), borderRadius: rs(50),
+  touchable: {
+    height: verticalScale(140), borderRadius: moderateScale(22),
+    overflow: "hidden", position: "relative",
   },
-  ringOuter: {
-    position: "absolute", top: -rs(60), right: -rs(60),
-    width: rs(200), height: rs(200), borderRadius: rs(100), borderWidth: 1,
+  glowRing: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: moderateScale(22), borderWidth: 1.5,
+    margin: moderateScale(2),
   },
-  ringInner: {
-    position: "absolute", top: -rs(30), right: -rs(30),
-    width: rs(120), height: rs(120), borderRadius: rs(60), borderWidth: 1,
+  livePill: {
+    position: "absolute", top: verticalScale(12), right: scale(12),
+    flexDirection: "row", alignItems: "center", gap: scale(5),
+    borderRadius: moderateScale(12), paddingHorizontal: scale(10), paddingVertical: verticalScale(5),
   },
-  border: { borderRadius: rs(22), borderWidth: 1 },
+  liveDot: {
+    width: moderateScale(6), height: moderateScale(6), borderRadius: moderateScale(3),
+    backgroundColor: "#4ADE80",
+  },
+  liveText: { fontSize: fontScale(10), fontWeight: "800", color: C.white, letterSpacing: 1.2 },
   content: {
     flex: 1, flexDirection: "row", alignItems: "center",
-    paddingHorizontal: rs(20), paddingVertical: rs(16), gap: rs(12),
+    paddingHorizontal: scale(20), paddingVertical: verticalScale(20), gap: scale(16),
   },
-  left: { flex: 1, gap: rs(7) },
-  badge: {
-    flexDirection: "row", alignSelf: "flex-start", alignItems: "center",
-    gap: rs(5), borderRadius: rs(8), borderWidth: 1,
-    paddingHorizontal: rs(8), paddingVertical: rs(3),
-  },
-  badgeTxt: { fontSize: rs(8), fontWeight: "900", letterSpacing: 1.8 },
-  title: {
-    fontSize: rs(22), fontWeight: "800",
-    color: C.ink, letterSpacing: -0.3, lineHeight: rs(26),
-  },
-  desc: { fontSize: rs(11), fontWeight: "500" },
+  left:  { flex: 1, gap: verticalScale(5) },
+  label: { fontSize: fontScale(22), fontWeight: "900", color: C.white, letterSpacing: -0.5 },
+  desc:  { fontSize: fontScale(12), color: C.white + "E6", fontWeight: "600" }, 
   cta: {
     flexDirection: "row", alignSelf: "flex-start", alignItems: "center",
-    gap: rs(7), borderRadius: rs(20), borderWidth: 1,
-    paddingLeft: rs(12), paddingRight: rs(4), paddingVertical: rs(5),
-    marginTop: rs(2),
+    gap: scale(8), borderRadius: moderateScale(16), marginTop: verticalScale(6),
+    paddingLeft: scale(12), paddingRight: scale(8), paddingVertical: verticalScale(7),
   },
-  ctaTxt:   { fontSize: rs(11), fontWeight: "700" },
+  ctaText:  { fontSize: fontScale(12), fontWeight: "700", color: C.white },
   ctaArrow: {
-    width: rs(22), height: rs(22), borderRadius: rs(11),
+    width: moderateScale(20), height: moderateScale(20), borderRadius: moderateScale(10),
     alignItems: "center", justifyContent: "center",
   },
-  orbArea: { alignItems: "center", justifyContent: "center" },
-  orbRing2: {
-    position: "absolute",
-    width: rs(88), height: rs(88), borderRadius: rs(22), borderWidth: 1,
-  },
-  orbRing1: {
-    width: rs(76), height: rs(76), borderRadius: rs(20),
+  orbWrap: { alignItems: "center", justifyContent: "center" },
+  orbOuter: {
+    width: moderateScale(80), height: moderateScale(80), borderRadius: moderateScale(40),
     borderWidth: 1.5, alignItems: "center", justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.02)",
   },
-  orb: {
-    width: rs(62), height: rs(62), borderRadius: rs(17),
+  orbInner: {
+    width: moderateScale(66), height: moderateScale(66), borderRadius: moderateScale(33),
     alignItems: "center", justifyContent: "center",
   },
 });
 
-const ts = StyleSheet.create({
-  wrap: { height: TILE_H, ...shadowMd },
+/* ─────────────────────────────────────────
+   TILE STYLES
+───────────────────────────────────────── */
+const tt = StyleSheet.create({
+  wrap: { 
+    height: verticalScale(140),
+    ...softShadow 
+  },
   card: {
-    flex: 1, backgroundColor: C.card,
-    borderRadius: rs(18), overflow: "hidden", padding: rs(12),
+    flex: 1, borderRadius: moderateScale(20), overflow: "hidden",
+    borderWidth: 1, alignItems: "center", justifyContent: "center",
+    paddingTop: verticalScale(12), paddingBottom: verticalScale(10), gap: verticalScale(10),
   },
-  notch: {
-    position: "absolute", top: 0, left: rs(14),
-    width: rs(24), height: rs(2.5), borderRadius: rs(2), opacity: 0.9,
+  stripe: {
+    position: "absolute", top: 0, left: 0, right: 0, height: verticalScale(4),
   },
-  border:   { borderRadius: rs(18), borderWidth: 1 },
-  iconWrap: {
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: rs(10),
+  badge: {
+    position: "absolute", top: verticalScale(8), right: scale(8),
+    borderRadius: moderateScale(6), paddingHorizontal: scale(6), paddingVertical: verticalScale(3),
   },
-  iconRing: {
-    width: rs(62), height: rs(62), borderRadius: rs(19), borderWidth: 1,
-    alignItems: "center", justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.018)",
-  },
+  badgeTxt: { fontSize: fontScale(9), fontWeight: "800", letterSpacing: 0.8 },
   iconBg: {
-    width: rs(50), height: rs(50), borderRadius: rs(15),
+    width: moderateScale(60), height: moderateScale(60), borderRadius: moderateScale(18),
     alignItems: "center", justifyContent: "center",
   },
   label: {
-    color: C.ink, fontSize: rs(13), fontWeight: "700",
-    lineHeight: rs(18),
-    letterSpacing: 0.1,
-    textAlign: "center",
+    fontSize: fontScale(14), fontWeight: "800", textAlign: "center",
+    lineHeight: fontScale(18), letterSpacing: 0.3, paddingHorizontal: scale(8),
   },
-  arrow: {
-    alignSelf: "flex-end",
-    width: rs(22), height: rs(22), borderRadius: rs(7), borderWidth: 1,
-    alignItems: "center", justifyContent: "center",
-  },
+});
+
+/* ─────────────────────────────────────────
+   SECTION BLOCK STYLES
+───────────────────────────────────────── */
+const sb = StyleSheet.create({
+  block: { marginBottom: verticalScale(32) },
+  row:   { flexDirection: "row", marginBottom: verticalScale(10), alignItems: "stretch" },
 });

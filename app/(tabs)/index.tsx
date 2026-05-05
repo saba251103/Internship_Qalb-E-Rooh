@@ -1,84 +1,151 @@
 import {
   Feather,
-  MaterialCommunityIcons
+  MaterialCommunityIcons,
 } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
   Animated,
+  AppState,
   Dimensions,
   Platform,
+  Pressable,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
-  TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import sahihBukhariData from '../../assets/data/sahih_bukhari.json';
+import { fetchTimingsFromBackend } from '../services/prayerService';
 
-/* ═══════════════════════════════════════════
-   RESPONSIVE SCALE — fluid across all devices
-═══════════════════════════════════════════ */
-const { width: W, height: H } = Dimensions.get('window');
-// Fluid scale: clamp tightly so large tablets don't over-scale
-const BASE = 390;
-const SCALE = Math.min(Math.max(W / BASE, 0.78), 1.30);
-const rs  = (n: number) => Math.round(n * SCALE);
-const rsp = (pct: number) => Math.round(W * pct); // % of screen width
-const PAD = rs(20);
+/* ═══════════════════════════════════════════════════════════════════
+   RESPONSIVE SCALE SYSTEM
+════════════════════════════════════════════════════════════════════ */
 
-/* ═══════════════════════════════════════════
-   DESIGN TOKENS — Sacred Luxury palette
-   Teal #0A4A4A + gold + warm creams
-═══════════════════════════════════════════ */
-const C = {
-  // Base surfaces
-  bg:        '#EEF7F5',   // soft mint-white page background
-  surface:   '#FFFFFF',
-  surfaceAlt:'#F5FAF9',
+const { width: SCREEN_W } = Dimensions.get('window');
+const BASE_W = 390;
 
-  // Teal family (dark → light)
-  teal0:     '#062626',   // deepest
-  teal1:     '#0A4A4A',   // primary brand
-  teal2:     '#0D5858',
-  teal3:     '#136060',
-  teal4:     '#1A7A70',
-  teal5:     '#4BA89E',
-  tealLt:    '#A8DDD8',
+const _scale = (n: number) => (SCREEN_W / BASE_W) * n;
 
-  // Gold family
-  gold:      '#D4942A',
-  goldMid:   '#E8B84B',
-  goldLt:    '#F5D98A',
-  goldPale:  '#FDF5E0',
-
-  // Text
-  ink:       '#072424',
-  inkMid:    '#2E6060',
-  inkLight:  '#6AABA5',
-  inkFaint:  'rgba(7,36,36,0.35)',
-
-  // Accents
-  coral:     '#E07060',
-  coralLt:   '#F5BEB6',
-
-  // Glassy
-  glass:     'rgba(255,255,255,0.12)',
-  glassM:    'rgba(255,255,255,0.22)',
-  glassBrd:  'rgba(255,255,255,0.20)',
-
-  white:     '#FFFFFF',
-  shadow:    '#041E1E',
+const rs = (n: number, f = 0.5) => {
+  const base = n + (_scale(n) - n) * f;
+  const iosBoost = Platform.OS === 'ios' ? 1.09 : 1;
+  return Math.round(base * iosBoost);
 };
 
-/* ═══════════════════════════════════════════
-   DATA SHAPES
-═══════════════════════════════════════════ */
+const font = (n: number) => {
+  const base = rs(n);
+  return Platform.OS === 'ios' ? base + 1 : base;
+};
+
+const clamp = (n: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, n));
+
+const PAD = clamp(rs(22), 18, 30);
+
+/* ═══════════════════════════════════════════════════════════════════
+   DESIGN TOKENS
+════════════════════════════════════════════════════════════════════ */
+const C = {
+  bg: '#EEF7F5',
+  surface: '#FFFFFF',
+  surfaceAlt: '#F5FAF9',
+  teal0: '#041E1E',
+  teal1: '#0A4A4A',
+  teal2: '#0D5858',
+  teal3: '#136060',
+  teal4: '#1A7A70',
+  teal5: '#4BA89E',
+  tealLt: '#A8DDD8',
+  tealFaint: 'rgba(10,74,74,0.08)',
+  gold: '#D4942A',
+  goldMid: '#E8B84B',
+  goldLt: '#F5D98A',
+  goldGlass: 'rgba(232,184,75,0.18)',
+  goldBorder: 'rgba(232,184,75,0.30)',
+  ink: '#072424',
+  inkMid: '#2E6060',
+  inkLight: '#6AABA5',
+  inkFaint: 'rgba(7,36,36,0.30)',
+  white: '#FFFFFF',
+  shadow: '#041E1E',
+  coral: '#E07060',
+  glassBrd: 'rgba(255,255,255,0.18)',
+};
+
+/* ═══════════════════════════════════════════════════════════════════
+   CONSTANTS
+════════════════════════════════════════════════════════════════════ */
+
+const PRAYER_NAMES = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'] as const;
+
+const ALL_PRAYERS: { name: string; icon: string }[] = [
+  { name: 'Fajr',    icon: 'weather-sunset-up' },
+  { name: 'Sunrise', icon: 'white-balance-sunny' },
+  { name: 'Dhuhr',   icon: 'sun-compass' },
+  { name: 'Asr',     icon: 'sun-clock' },
+  { name: 'Maghrib', icon: 'weather-sunset' },
+  { name: 'Isha',    icon: 'moon-waning-crescent' },
+];
+
+const QUICK_ACTIONS = [
+  { id: 'khatam',  label: 'Khatam',   icon: 'check-decagram-outline', route: '/screens/khatam' },
+  { id: 'zakat',   label: 'Zakat',    icon: 'hand-coin-outline',       route: '/screens/zakat' },
+  { id: 'duas',    label: 'Duas',     icon: 'hand-heart-outline',      route: '/screens/duas' },
+  { id: 'mosque',  label: 'Mosques',  icon: 'mosque',                  route: '/screens/mosque' },
+  { id: 'tracker', label: 'Tracker',  icon: 'star-four-points-outline', route: '/screens/tracker' },
+  { id: 'cal',     label: 'Calendar', icon: 'calendar-blank-outline',  route: '/screens/calender' },
+  { id: 'makkah',  label: 'Makkah',   icon: 'video-outline',           route: '/screens/makkah_live' },
+  { id: 'more',    label: 'More',     icon: 'dots-horizontal',         route: '/screens/features' },
+];
+
+const DAILY_DUAS = [
+  {
+    id: 'morning',
+    title: 'Morning',
+    icon: 'weather-sunset-up' as const,
+    arabic: 'اللّهُمَّ بِكَ أَصْبَحْنَا وَبِكَ أَمْسَيْنَا',
+    translation: 'O Allah, by You we enter the morning and evening.',
+    gradColors: [C.teal0, C.teal2] as [string, string],
+  },
+  {
+    id: 'evening',
+    title: 'Evening',
+    icon: 'weather-night' as const,
+    arabic: 'اللّهُمَّ بِكَ أَمْسَيْنَا وَبِكَ أَصْبَحْنَا',
+    translation: 'O Allah, by You we enter the evening and morning.',
+    gradColors: [C.teal1, C.teal3] as [string, string],
+  },
+  {
+    id: 'sleep',
+    title: 'Before Sleep',
+    icon: 'power-sleep' as const,
+    arabic: 'بِاسْمِكَ اللَّهُمَّ أَمُوتُ وَأَحْيَا',
+    translation: 'In Your name, O Allah, I die and live.',
+    gradColors: [C.teal2, C.teal4] as [string, string],
+  },
+  {
+    id: 'wakeup',
+    title: 'After Waking',
+    icon: 'weather-sunset' as const,
+    arabic: 'الْحَمْدُ لِلَّهِ الَّذِي أَحْيَانَا بَعْدَ مَا أَمَاتَنَا',
+    translation: 'Praise be to Allah who gave us life after death.',
+    gradColors: [C.teal0, C.teal3] as [string, string],
+  },
+];
+
 interface HadithEntry {
   info: string;
   by: string;
@@ -87,944 +154,549 @@ interface HadithEntry {
   volumeName: string;
 }
 
-const RAMADAN_DUAS = [
-  {
-    id: 'sehri',
-    title: 'SUHOOR DUA',
-    subtitle: 'Before Fasting',
-    icon: 'weather-night' as const,
-    arabic: 'نَوَيْتُ أَنْ أَصُومَ غَدًا لِلَّهِ تَعَالَى مِنْ شَهْرِ رَمَضَانَ',
-    gradA: '#0A4A4A',
-    gradB: '#062626',
-  },
-  {
-    id: 'iftar',
-    title: 'IFTAR DUA',
-    subtitle: 'Breaking Fast',
-    icon: 'weather-sunset' as const,
-    arabic: 'اللَّهُمَّ لَكَ صُمْتُ وَعَلَى رِزْقِكَ أَفْطَرْتُ',
-    gradA: '#5C2A00',
-    gradB: '#3A1800',
-  },
-  {
-    id: 'ashra2',
-    title: 'ASHRA-E-MAGHFIRAT',
-    subtitle: 'Second 10 Days',
-    icon: 'water-outline' as const, 
-    arabic: 'أَسْتَغْفِرُ اللَّهَ رَبِّي مِنْ كُلِّ ذَنْبٍ وَأَتُوبُ إِلَيْهِ',
-    gradA: '#1A4A2A',
-    gradB: '#0A2A12',
-  },
-];
-
-const TARAWEEH_TASBEEH ="سُبْحَانَ ذِي الْمُلْكِ وَالْمَلَكُوتِ، سُبْحَانَ ذِي الْعِزَّةِ وَالْعَظَمَةِ وَالْهَيْبَةِ وَالْقُدْرَةِ وَالْكِبْرِيَاءِ وَالْجَبَرُوتِ، سُبْحَانَ الْمَلِكِ الْحَيِّ الَّذِي لَا يَنَامُ وَلَا يَمُوتُ، سُبُّوحٌ قُدُّوسٌ رَبُّنَا وَرَبُّ الْمَلَائِكَةِ وَالرُّوحِ، اللَّهُمَّ أَجِرْنَا مِنَ النَّارِ يَا مُجِيرُ يَا مُجِيرُ يَا مُجِيرُ."
-
-const TARAWEEH_STAGES = [4, 8, 12, 16, 20];
-
-const MAIN_FEATURES = [
-  { id: 1, name: 'Khatam',   icon: 'check-decagram-outline',    route: '../../screens/khatam'      },
-  { id: 2, name: 'Zakat',    icon: 'hand-coin-outline',         route: '../../screens/zakat'       },
-  { id: 3, name: 'Calendar', icon: 'calendar-blank-outline',    route: '../../screens/calender'    },
-  { id: 4, name: 'Makkah',   icon: 'video-outline',             route: '../../screens/makkah_live' },
-  { id: 5, name: 'Duas',     icon: 'hand-heart-outline',        route: '../../screens/duas'        },
-  { id: 6, name: 'Mosques',  icon: 'mosque',                    route: '../../screens/mosque'      },
-  { id: 7, name: 'Prayer Tracker',    icon: 'star-four-points-outline',  route: '../../screens/tracker'       },
-  { id: 8, name: 'More',     icon: 'dots-horizontal',           route: '../../screens/features'    },
-];
-
-/* ═══════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════════
    HELPERS
-═══════════════════════════════════════════ */
-const formatTime12H = (t: string) => {
-  if (!t) return '--:--';
-  const [hStr, min] = t.split(':');
-  let h = parseInt(hStr, 10);
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  h = h % 12 || 12;
-  return `${String(h).padStart(2, '0')}:${min} ${ampm}`;
+════════════════════════════════════════════════════════════════════ */
+
+const toMins = (t24: string) => {
+  if (!t24) return -1;
+  const [h, m] = t24.split(':').map(Number);
+  return h * 60 + m;
 };
 
-const calcCountdown = (t24: string) => {
-  if (!t24) return '--h --m';
+const fmt12 = (t24: string) => {
+  if (!t24) return '--:--';
+  const [hStr, min] = t24.split(':');
+  let h = parseInt(hStr, 10);
+  const ap = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${h}:${min} ${ap}`;
+};
+
+const countdown = (t24: string) => {
+  if (!t24) return '';
   const now = new Date();
   const [th, tm] = t24.split(':').map(Number);
-  const target = new Date();
-  target.setHours(th, tm, 0, 0);
-  if (target < now) target.setDate(target.getDate() + 1);
-  const ms = target.getTime() - now.getTime();
-  const h  = Math.floor(ms / 3_600_000);
-  const m  = Math.floor((ms % 3_600_000) / 60_000);
-  return `${h}h ${m}m`;
+  const tgt = new Date();
+  tgt.setHours(th, tm, 0, 0);
+  if (tgt <= now) tgt.setDate(tgt.getDate() + 1);
+  const ms = tgt.getTime() - now.getTime();
+  const h = Math.floor(ms / 3_600_000);
+  const m = Math.floor((ms % 3_600_000) / 60_000);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
 };
 
-/* ═══════════════════════════════════════════
+const greeting = () => {
+  const h = new Date().getHours();
+  if (h < 5)  return 'Good Night';
+  if (h < 12) return 'Good Morning';
+  if (h < 17) return 'Good Afternoon';
+  if (h < 21) return 'Good Evening';
+  return 'Good Night';
+};
+
+// 🔥 Optimized O(1) Hadith selector to prevent UI blocking
+const getHadithForToday = (): HadithEntry | null => {
+  try {
+    const data = sahihBukhariData as any[];
+    if (!data?.length) return null;
+    
+    const totalVolumes = data.length;
+    const doy = Math.floor(
+      (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000
+    );
+    
+    const vol = data[doy % totalVolumes];
+    if (!vol?.books?.length) return null;
+    
+    const book = vol.books[doy % vol.books.length] || vol.books[0];
+    if (!book?.hadiths?.length) return null;
+    
+    const hadith = book.hadiths[doy % book.hadiths.length] || book.hadiths[0];
+    
+    return { ...hadith, bookName: book.name, volumeName: vol.name };
+  } catch (error) {
+    console.error('Failed to parse Hadith:', error);
+    return null;
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════════
    MICRO-COMPONENTS
-═══════════════════════════════════════════ */
+════════════════════════════════════════════════════════════════════ */
 
-/* Islamic 8-pointed star ornament */
-const StarOrn: React.FC<{ color: string; size?: number }> = ({ color, size = rs(14) }) => (
-  <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-    <View style={{ position: 'absolute', width: size * 0.6, height: size * 0.6, borderWidth: 1, borderColor: color }} />
-    <View style={{ position: 'absolute', width: size * 0.6, height: size * 0.6, borderWidth: 1, borderColor: color, transform: [{ rotate: '45deg' }] }} />
-  </View>
-);
-
-/* Pressable with spring scale */
-const SpringPress: React.FC<{
+const PressScale: React.FC<{
   onPress: () => void;
   style?: any;
   children: React.ReactNode;
-}> = ({ onPress, style, children }) => {
-  const scale = useRef(new Animated.Value(1)).current;
-  const press = () => Animated.spring(scale, { toValue: 0.95, useNativeDriver: true, speed: 60, bounciness: 0 }).start();
-  const release = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 28, bounciness: 6 }).start();
+  activeScale?: number;
+}> = ({ onPress, style, children, activeScale = 0.96 }) => {
+  const sv = useRef(new Animated.Value(1)).current;
+
+  const pressIn = () =>
+    Animated.spring(sv, { toValue: activeScale, useNativeDriver: true, speed: 80, bounciness: 0 }).start();
+
+  const pressOut = () =>
+    Animated.spring(sv, { toValue: 1, useNativeDriver: true, speed: 30, bounciness: 7 }).start();
+
   return (
-    <Animated.View style={[{ transform: [{ scale }] }, style]}>
-      <TouchableOpacity activeOpacity={1} onPress={onPress} onPressIn={press} onPressOut={release}>
+    <Animated.View style={[style, { transform: [{ scale: sv }] }]}>
+      <Pressable onPress={onPress} onPressIn={pressIn} onPressOut={pressOut} android_ripple={{ color: 'rgba(0,0,0,0.06)', borderless: false }}>
         {children}
-      </TouchableOpacity>
+      </Pressable>
     </Animated.View>
   );
 };
 
-/* Decorative horizontal section divider */
-const Divider: React.FC<{ label: string }> = ({ label }) => (
-  <View style={div.row}>
-    <StarOrn color={C.goldMid} size={rs(11)} />
-    <View style={div.line} />
-    <View style={div.badge}>
-      <Text style={div.badgeTxt}>{label}</Text>
+const GoldDivider: React.FC<{ label: string }> = ({ label }) => (
+  <View style={gd.row}>
+    <View style={gd.line} />
+    <View style={gd.pill}>
+      <Text style={gd.pillTxt}>{label}</Text>
     </View>
-    <View style={div.line} />
-    <StarOrn color={C.goldMid} size={rs(11)} />
+    <View style={gd.line} />
   </View>
 );
-const div = StyleSheet.create({
-  row:      { flexDirection: 'row', alignItems: 'center', marginHorizontal: PAD, marginBottom: rs(18), marginTop: rs(4) },
-  line:     { flex: 1, height: 1, backgroundColor: `${C.teal1}20`, marginHorizontal: rs(8) },
-  badge:    { backgroundColor: C.teal1, paddingHorizontal: rs(14), paddingVertical: rs(5), borderRadius: rs(20) },
-  badgeTxt: { color: C.white, fontSize: rs(10), fontWeight: '800', letterSpacing: 1.2 },
+
+const gd = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center', marginHorizontal: PAD, marginBottom: rs(16), marginTop: rs(8) },
+  line: { flex: 1, height: StyleSheet.hairlineWidth * 2, backgroundColor: C.inkFaint },
+  pill: { backgroundColor: C.teal1, paddingHorizontal: rs(14), paddingVertical: rs(5), borderRadius: rs(24), marginHorizontal: rs(10) },
+  pillTxt: { color: C.white, fontSize: clamp(rs(10), 9, 13), fontWeight: '800', letterSpacing: 1.4 },
 });
 
-/* ═══════════════════════════════════════════
-   MAIN COMPONENT
-═══════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════
+   MAIN SCREEN
+════════════════════════════════════════════════════════════════════ */
+
 export default function HomeScreen() {
   const router = useRouter();
+  const { width: dynamicWidth } = useWindowDimensions();
 
-  const [loading, setLoading]             = useState(true);
-  const [locationName, setLocationName]   = useState('Detecting…');
-  const [timings, setTimings]             = useState<any>(null);
-  const [hijriDate, setHijriDate]         = useState('');
-  const [nextPrayer, setNextPrayer]       = useState({ name: 'Fajr', time: '', countdown: '' });
-  const [sehriCountdown, setSehriC]       = useState('');
-  const [iftarCountdown, setIftarC]       = useState('');
-  const [taraweeh, setTaraweeh]           = useState(0);
-  const [dailyHadith, setDailyHadith]     = useState<HadithEntry | null>(null);
+  /* ── State ── */
+  const [loading, setLoading]         = useState(true);
+  const [locationName, setLocation]   = useState('Detecting…');
+  const [timings, setTimings]         = useState<Record<string, string> | null>(null);
+  const [hijriDate, setHijriDate]     = useState('');
+  const [nextPrayer, setNextPrayer]   = useState({ name: 'Fajr', time: '' });
+  const [countdown2next, setC2N]      = useState('');
+  const [sehriEnd, setSehriEnd]       = useState('');
+  const [iftarStart, setIftarStart]   = useState('');
+  const [hadith, setHadith]           = useState<HadithEntry | null>(null);
+  const [prayerSchool]                = useState(1);
+  const [locationDenied, setLocDenied]= useState(false);
 
-  /* Fade-in on mount */
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  /* ── Animations ── */
+  const fadeIn = useRef(new Animated.Value(0)).current;
+  const slideY = useRef(new Animated.Value(18)).current;
+
+  const runEntrance = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(fadeIn, { toValue: 1, duration: 480, useNativeDriver: true }),
+      Animated.spring(slideY, { toValue: 0, useNativeDriver: true, speed: 14, bounciness: 4 }),
+    ]).start();
+  }, [fadeIn, slideY]);
+
+  /* ── Load prayer data (with Crash Safety) ── */
   useEffect(() => {
-    if (!loading) Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
-  }, [loading]);
-
-  /* Location + prayer times */
-  useEffect(() => {
+    let alive = true;
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') { setLocationName('Permission Denied'); setLoading(false); return; }
+        let city = 'Mumbai', country = 'India';
 
-        const loc  = await Location.getCurrentPositionAsync({});
-        const { latitude, longitude } = loc.coords;
-        const geo  = await Location.reverseGeocodeAsync({ latitude, longitude });
-        if (geo.length) setLocationName(geo[0].city || geo[0].district || 'Your City');
+        if (status === 'granted') {
+          try {
+            // Added 5-second timeout and balanced accuracy for rapid response
+            const pos = await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Balanced,
+            });
+            
+            try {
+              const geo = await Location.reverseGeocodeAsync(pos.coords);
+              if (geo.length) {
+                city    = geo[0].city || geo[0].district || city;
+                country = geo[0].country || country;
+                if (alive) setLocation(city);
+              }
+            } catch (geoErr) {
+              console.warn('[Location] Reverse geocode timeout/fail:', geoErr);
+              if (alive) setLocation('Location Found'); // Graceful degradation
+            }
 
-        const dateStr = new Date().toLocaleDateString('en-GB').replace(/\//g, '-');
-        const res     = await fetch(`https://api.aladhan.com/v1/timings/${dateStr}?latitude=${latitude}&longitude=${longitude}&method=1`);
-        const data    = await res.json();
-
-        if (data.code === 200) {
-          setTimings(data.data.timings);
-          const hd = data.data.date.hijri;
-          let day  = parseInt(hd.day, 10) - 1;
-          let month = hd.month.en;
-          let year  = parseInt(hd.year, 10);
-          if (day === 0) {
-            const months = ['Muharram','Safar','Rabi al-Awwal','Rabi al-Thani','Jumada al-Awwal','Jumada al-Thani','Rajab',"Sha'ban",'Ramadan','Shawwal',"Dhu al-Qi'dah",'Dhu al-Hijjah'];
-            let mi = months.findIndex(m => m === month) - 1;
-            if (mi < 0) { mi = 11; year -= 1; }
-            month = months[mi]; day = 30;
+          } catch (posErr) {
+            console.warn('[Location] Position fetch timeout/fail:', posErr);
+            if (alive) setLocation('Mumbai'); // Fallback
           }
-          setHijriDate(`${day} ${month} ${year}`);
+        } else {
+          if (alive) {
+            setLocDenied(true);
+            setLocation('Mumbai'); // Fallback
+          }
         }
-      } catch (e) { console.error(e); }
-      finally { setLoading(false); }
-    })();
-  }, []);
 
-  /* Hadith of the day */
-  useEffect(() => {
-    try {
-      const all: HadithEntry[] = [];
-      (sahihBukhariData as any[]).forEach(vol =>
-        vol.books.forEach((book: any) =>
-          book.hadiths.forEach((h: any) => all.push({ ...h, bookName: book.name, volumeName: vol.name }))
-        )
-      );
-      if (all.length) {
-        const now = new Date();
-        const day = Math.floor((now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 86400000);
-        setDailyHadith(all[day % all.length]);
+        const res = await fetchTimingsFromBackend(city, country, prayerSchool);
+        if (res && alive) {
+          res.timings && setTimings(res.timings);
+          if (res.hijri) {
+            const { day, month, year } = res.hijri;
+            setHijriDate(`${day} ${month.en} ${year} AH`);
+          }
+        }
+      } catch (e) {
+        console.error('[HomeScreen] load error:', e);
+      } finally {
+        if (alive) setLoading(false);
       }
-    } catch (e) { console.error(e); }
+    })();
+    return () => { alive = false; };
+  }, [prayerSchool]);
+
+  useEffect(() => { if (!loading) runEntrance(); }, [loading, runEntrance]);
+
+  useEffect(() => {
+    setHadith(getHadithForToday());
   }, []);
 
-  /* Countdown tick */
+  /* ── Tick: next prayer + countdowns (With AppState Pause) ── */
   const tick = useCallback(() => {
     if (!timings) return;
-    const prayers = [
-      { name: 'Fajr', time: timings.Fajr }, { name: 'Dhuhr', time: timings.Dhuhr },
-      { name: 'Asr', time: timings.Asr },   { name: 'Maghrib', time: timings.Maghrib },
-      { name: 'Isha', time: timings.Isha },
-    ];
-    const now = new Date();
-    const cur = now.getHours() * 60 + now.getMinutes();
-    let next  = prayers[0];
-    for (const p of prayers) {
-      const [h, m] = p.time.split(':').map(Number);
-      if (h * 60 + m > cur) { next = p; break; }
+    const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
+    let next = { name: 'Fajr', time: timings['Fajr'] || '' };
+    for (const name of PRAYER_NAMES) {
+      const t = timings[name];
+      if (t && toMins(t) > nowMins) { next = { name, time: t }; break; }
     }
-    setNextPrayer({ name: next.name, time: next.time, countdown: calcCountdown(next.time) });
-    if (timings.Imsak)   setSehriC(calcCountdown(timings.Imsak));
-    if (timings.Maghrib) setIftarC(calcCountdown(timings.Maghrib));
+    setNextPrayer(next);
+    setC2N(countdown(next.time));
+    setSehriEnd(timings['Imsak'] ? countdown(timings['Imsak']) : '');
+    setIftarStart(timings['Maghrib'] ? countdown(timings['Maghrib']) : '');
   }, [timings]);
 
-  useEffect(() => { tick(); const id = setInterval(tick, 60_000); return () => clearInterval(id); }, [tick]);
+  useEffect(() => {
+    tick(); // Initial call
+    let intervalId: ReturnType<typeof setInterval> | null = setInterval(tick, 30_000);
 
-  /* ─── LOADING SCREEN ─── */
+    // Pause ticking when app is backgrounded to save battery
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        tick(); 
+        if (!intervalId) intervalId = setInterval(tick, 30_000);
+      } else {
+        if (intervalId) {
+          clearInterval(intervalId);
+          intervalId = null;
+        }
+      }
+    });
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+      subscription.remove();
+    };
+  }, [tick]);
+
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: C.teal1, justifyContent: 'center', alignItems: 'center' }}>
-    
-        <ActivityIndicator size="large" color={C.goldMid} style={{ marginTop: rs(24) }} />
-        <Text style={{ color: C.tealLt, fontSize: rs(13), marginTop: rs(12), letterSpacing: 0.5 }}>Loading…</Text>
+      <View style={ls.root}>
+        <StatusBar barStyle="light-content" backgroundColor={C.teal1} />
+        <LinearGradient colors={[C.teal0, C.teal1]} style={StyleSheet.absoluteFill} />
+        <ActivityIndicator size="large" color={C.goldMid} />
+        <Text style={ls.txt}>Loading prayer times…</Text>
       </View>
     );
   }
 
+  // Dynamic grid setup to prevent Layout Thrashing on split-screen
+  const dynamicCols = dynamicWidth < 360 ? 3 : dynamicWidth >= 768 ? 5 : 4;
+  const dynamicCellW = (dynamicWidth - PAD * 2) / dynamicCols;
+
   return (
     <SafeAreaView style={s.root} edges={['top', 'left', 'right']}>
-      <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={s.scroll}
-          keyboardShouldPersistTaps="handled"
-        >
+      <StatusBar barStyle="light-content" backgroundColor={C.teal0} />
 
-          {/* ══════════════════════════════
-              HEADER — full cinematic hero
-          ══════════════════════════════ */}
-          <View style={s.heroWrap}>
-            <LinearGradient
-              colors={[C.teal0, C.teal1, C.teal3]}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
+      <Animated.View style={{ flex: 1, opacity: fadeIn, transform: [{ translateY: slideY }] }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" overScrollMode="never">
 
-            {/* Geometric ring ornaments */}
-            {[rs(260), rs(190), rs(130)].map((sz, i) => (
-              <View key={i} style={{
-                position: 'absolute', top: -sz * 0.3, right: -sz * 0.3,
-                width: sz, height: sz, borderRadius: sz / 2,
-                borderWidth: 1,
-                borderColor: i === 0
-                  ? 'rgba(77,168,158,0.12)'
-                  : i === 1 ? 'rgba(212,148,42,0.14)' : 'rgba(255,255,255,0.10)',
-              }} />
+          {/* ═══════════════ HERO ═══════════════ */}
+          <View style={s.hero}>
+            <LinearGradient colors={[C.teal0, C.teal1, C.teal2]} start={{ x: 0.0, y: 0.0 }} end={{ x: 1.0, y: 1.0 }} style={StyleSheet.absoluteFill} />
+
+            {[rs(280), rs(200), rs(140)].map((sz, i) => (
+              <View key={i} style={{ position: 'absolute', top: -sz * 0.28, right: -sz * 0.28, width: sz, height: sz, borderRadius: sz / 2, borderWidth: 1, borderColor: i === 1 ? 'rgba(212,148,42,0.12)' : 'rgba(77,168,158,0.10)' }} />
             ))}
 
-            {/* Gold shimmer bar at top */}
-            <LinearGradient
-              colors={['transparent', C.goldMid + '88', C.goldLt + '99', C.goldMid + '55', 'transparent']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={{ position: 'absolute', top: 0, left: 0, right: 0, height: rs(2.5) }}
-            />
+            <LinearGradient colors={['transparent', C.goldMid + '99', C.goldLt + 'AA', C.goldMid + '66', 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: rs(2) }} />
 
-            {/* App name row */}
-            <View style={s.heroTop}>
-              <View>
+            <View style={s.heroHeader}>
+              <View style={s.heroHeaderLeft}>
+                <View style={s.greetRow}>
+                  <Text style={s.greetTxt}>{greeting()}</Text>
+                </View>
                 <Text style={s.appName}>Qalb-E-Rooh</Text>
-                <View style={s.locRow}>
-                  <MaterialCommunityIcons name="map-marker" size={rs(13)} color={C.goldMid} />
-                  <Text style={s.locTxt}>{locationName}</Text>
-                </View>
               </View>
-              <View style={s.heroRight}>
-                <View style={s.hijriPill}>
-                  <StarOrn color={C.goldMid} size={rs(9)} />
-                  <Text style={s.hijriTxt}>{hijriDate}</Text>
-                </View>
-              </View>
-            </View>
 
-            {/* Welcome phrase */}
-            <View style={s.heroMid}>
-              <Text style={s.heroArabic}>بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</Text>
-              <Text style={s.heroTagline}>Guiding Heart & Soul</Text>
-            </View>
-
-            {/* ── PRAYER TIME CARDS ── */}
-            <View style={s.prayerRow}>
-              {[
-                { label: 'Sehri Ends',     val: formatTime12H(timings?.Imsak),   sub: `Ends in ${sehriCountdown}`,   icon: 'weather-night' },
-                { label: `Next: ${nextPrayer.name}`, val: formatTime12H(nextPrayer.time), sub: `In ${nextPrayer.countdown}`, icon: 'clock-outline', featured: true },
-                { label: 'Iftar Starts',   val: formatTime12H(timings?.Maghrib), sub: `Starts in ${iftarCountdown}`, icon: 'weather-sunset' },
-              ].map((card, i) => (
-                <View key={i} style={[s.pCard, card.featured && s.pCardFeatured]}>
-                  {card.featured && (
-                    <LinearGradient
-                      colors={[C.goldMid + '22', C.goldMid + '08']}
-                      style={StyleSheet.absoluteFill}
-                    />
-                  )}
-                  <MaterialCommunityIcons
-                    name={card.icon as any}
-                    size={rs(16)}
-                    color={card.featured ? C.goldMid : C.tealLt}
-                  />
-                  <Text style={[s.pCardLabel, card.featured && { color: C.goldLt }]}>{card.label}</Text>
-                  <Text style={[s.pCardVal, card.featured && { color: C.goldMid }]}>{card.val}</Text>
-                  <Text style={[s.pCardSub, card.featured && { color: C.goldLt + 'CC' }]}>{card.sub}</Text>
-                  {card.featured && (
-                    <View style={s.pCardDot} />
-                  )}
-                </View>
-              ))}
-            </View>
-
-            {/* Ramadan Calendar quick-link */}
-            <SpringPress
-              onPress={() => router.push('../../screens/Ramadantimings' as any)}
-              style={s.heroLink}
-            >
-              <View style={s.heroLinkInner}>
-                <View style={s.heroLinkIconWrap}>
-                  <MaterialCommunityIcons name="calendar-month" size={rs(20)} color={C.gold} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.heroLinkTitle}>Mahe Ramadan Calendar</Text>
-                  <Text style={s.heroLinkSub}>Full ramadan schedule</Text>
-                </View>
-                <View style={s.heroLinkArrow}>
-                  <Feather name="arrow-right" size={rs(14)} color={C.teal1} />
-                </View>
-              </View>
-            </SpringPress>
-          </View>
-
-          {/* ══════════════════════════════
-              FEATURES GRID
-          ══════════════════════════════ */}
-          <View style={s.section}>
-            <Divider label="FEATURES" />
-            <View style={s.featGrid}>
-              {MAIN_FEATURES.map((f) => (
-                <SpringPress key={f.id} onPress={() => router.push(f.route as any)} style={s.featItemWrap}>
-                  <View style={s.featItem}>
-                    <View style={s.featIconWrap}>
-                      {/* Subtle gradient bg inside icon */}
-                      <LinearGradient
-                        colors={[`${C.teal1}18`, `${C.teal1}06`]}
-                        style={StyleSheet.absoluteFill}
-                      />
-                      <MaterialCommunityIcons name={f.icon as any} size={rs(26)} color={C.teal1} />
-                    </View>
-                    <Text style={s.featLabel}>{f.name}</Text>
+              <View style={s.heroHeaderRight}>
+                {locationDenied ? (
+                  <Pressable onPress={() => Location.requestForegroundPermissionsAsync()} style={s.locAlert}>
+                    <MaterialCommunityIcons name="map-marker-off" size={rs(13)} color={C.coral} />
+                    <Text style={s.locAlertTxt}>Enable location</Text>
+                  </Pressable>
+                ) : (
+                  <View style={s.locRow}>
+                    <MaterialCommunityIcons name="map-marker" size={rs(12)} color={C.goldMid} />
+                    <Text style={s.locTxt} numberOfLines={1}>{locationName}</Text>
                   </View>
-                </SpringPress>
+                )}
+                {!!hijriDate && (
+                  <View style={s.hijriPill}>
+                    <Text style={s.hijriTxt}>{hijriDate}</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+
+            <View style={s.verseWrap}>
+              <Text style={s.verseAr}>أَلَا بِذِكْرِ اللَّهِ تَطْمَئِنُّ الْقُلُوبُ</Text>
+              <Text style={s.verseEn}>In the remembrance of Allah do hearts find rest.</Text>
+              <Text style={s.verseRef}>Surah Ar-Ra'd · 13:28</Text>
+            </View>
+
+            <View style={s.nextPrayerCard}>
+              <LinearGradient colors={[C.goldGlass, 'rgba(232,184,75,0.06)']} style={StyleSheet.absoluteFill} />
+              <View style={s.npc_border} />
+
+              <View style={s.npc_left}>
+                <Text style={s.npc_label}>NEXT PRAYER</Text>
+                <Text style={s.npc_name}>{nextPrayer.name}</Text>
+                <Text style={s.npc_time}>{fmt12(nextPrayer.time)}</Text>
+              </View>
+
+              <View style={s.npc_divider} />
+
+              <View style={s.npc_right}>
+                <MaterialCommunityIcons name="clock-outline" size={rs(22)} color={C.goldMid} style={{ marginBottom: rs(4) }} />
+                <Text style={s.npc_cdLabel}>STARTS IN</Text>
+                <Text style={s.npc_cd}>{countdown2next || '--'}</Text>
+              </View>
+            </View>
+
+            {(!!sehriEnd || !!iftarStart) && (
+              <View style={s.ramadanRow}>
+                {[
+                  { label: 'Sehri ends',   val: fmt12(timings?.Imsak || ''),   cd: sehriEnd,   icon: 'weather-night' },
+                  { label: 'Iftar starts', val: fmt12(timings?.Maghrib || ''), cd: iftarStart, icon: 'weather-sunset' },
+                ].map((item, i) => (
+                  <View key={i} style={s.ramCard}>
+                    <MaterialCommunityIcons name={item.icon as any} size={rs(15)} color={C.tealLt} />
+                    <Text style={s.ramLabel}>{item.label}</Text>
+                    <Text style={s.ramTime}>{item.val}</Text>
+                    {!!item.cd && <Text style={s.ramCd}>in {item.cd}</Text>}
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+
+          {/* ═══════════════ PRAYER TIMES STRIP ═══════════════ */}
+          <View style={s.prayerStrip}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.prayerStripInner} snapToInterval={rs(92)} decelerationRate="fast">
+              {ALL_PRAYERS.map(({ name, icon }) => {
+                const rawTime = timings?.[name] || '';
+                const isNext = name === nextPrayer.name;
+                return (
+                  <View key={name} style={[s.pCell, isNext && s.pCellActive]}>
+                    {isNext && <LinearGradient colors={[C.teal1, C.teal2]} style={StyleSheet.absoluteFill} />}
+                    <MaterialCommunityIcons name={icon as any} size={rs(20)} color={isNext ? C.goldMid : C.inkLight} />
+                    <Text style={[s.pCellName, isNext && s.pCellNameActive]}>{name}</Text>
+                    <Text style={[s.pCellTime, isNext && s.pCellTimeActive]}>{rawTime ? fmt12(rawTime) : '--:--'}</Text>
+                    {isNext && <View style={s.pCellDot} />}
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+
+          {/* ═══════════════ QUICK ACTIONS GRID ═══════════════ */}
+          <View style={s.section}>
+            <GoldDivider label="FEATURES" />
+            <View style={[s.grid, { paddingHorizontal: PAD }]}>
+              {QUICK_ACTIONS.map((f) => (
+                <PressScale
+                  key={f.id}
+                  onPress={() => router.push(f.route as any)}
+                  style={{ width: dynamicCellW, alignItems: 'center', marginBottom: rs(18) }}
+                >
+                  <View style={s.gridIconWrap}>
+                    <MaterialCommunityIcons name={f.icon as any} size={rs(28)} color={C.teal1} />
+                  </View>
+                  <Text style={s.gridLabel} numberOfLines={1}>{f.label}</Text>
+                </PressScale>
               ))}
             </View>
           </View>
 
-          {/* ══════════════════════════════
-              RAMADAN DUAS — horizontal
-          ══════════════════════════════ */}
+          {/* ═══════════════ DAILY DUAS ═══════════════ */}
           <View style={{ marginTop: rs(4) }}>
-            <Divider label="RAMADAN DUAS" />
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: PAD, paddingBottom: rs(6) }}
-            >
-              {RAMADAN_DUAS.map((dua) => (
-                <SpringPress key={dua.id} onPress={() => {}} style={s.duaCardWrap}>
-                  <LinearGradient
-                    colors={[dua.gradA, dua.gradB]}
-                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                    style={s.duaCard}
-                  >
-                    {/* Gold shimmer top */}
-                    <LinearGradient
-                      colors={[C.goldMid + '60', 'transparent']}
-                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                      style={{ position: 'absolute', top: 0, left: 0, right: 0, height: rs(2) }}
-                    />
-                    {/* Bg watermark */}
-                    <MaterialCommunityIcons
-                      name="mosque" size={rs(100)} color={C.white}
-                      style={{ position: 'absolute', bottom: -rs(14), right: -rs(14), opacity: 0.05 }}
-                    />
-                    {/* Badge */}
-                    <View style={s.duaBadge}>
-                      <MaterialCommunityIcons name={dua.icon} size={rs(12)} color={C.goldMid} style={{ marginRight: rs(5) }} />
-                      <Text style={s.duaBadgeTxt}>{dua.title}</Text>
+            <GoldDivider label="DAILY DUAS" />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: PAD, paddingBottom: rs(6) }} snapToInterval={rs(260) + rs(12)} decelerationRate="fast" pagingEnabled={false}>
+              {DAILY_DUAS.map((dua, i) => (
+                <PressScale key={dua.id} onPress={() => router.push('/screens/duas' as any)} style={s.duaCardWrap}>
+                  <LinearGradient colors={dua.gradColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.duaCard}>
+                    <LinearGradient colors={[C.goldMid + '70', 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: rs(2) }} />
+                    <View style={s.duaPagRow}>
+                      {DAILY_DUAS.map((_, j) => <View key={j} style={[s.duaPagDot, i === j && s.duaPagDotActive]} />)}
                     </View>
-                    <Text style={s.duaSub}>{dua.subtitle}</Text>
-                    <Text style={s.duaArabic}>{dua.arabic}</Text>
+                    <View style={s.duaHeader}>
+                      <MaterialCommunityIcons name={dua.icon} size={rs(16)} color={C.goldMid} />
+                      <Text style={s.duaTitle}>{dua.title}</Text>
+                    </View>
+                    <Text style={s.duaArabic} numberOfLines={3}>{dua.arabic}</Text>
+                    <Text style={s.duaTrans} numberOfLines={3}>{dua.translation}</Text>
+                    <View style={s.duaReadMore}>
+                      <Text style={s.duaReadMoreTxt}>View full dua</Text>
+                      <Feather name="arrow-right" size={rs(11)} color={C.goldLt} />
+                    </View>
                   </LinearGradient>
-                </SpringPress>
+                </PressScale>
               ))}
             </ScrollView>
-
-            {/* Nav link */}
-            <SpringPress
-              onPress={() => router.push('../../screens/ramadanduas' as any)}
-              style={s.navLinkWrap}
-            >
-              <View style={s.navLink}>
-                <View style={s.navLinkIcon}>
-                  <MaterialCommunityIcons name="book-open-page-variant" size={rs(20)} color={C.teal1} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.navLinkTitle}>Mahe Ramadan Dua</Text>
-                  <Text style={s.navLinkSub}>All duas for every day</Text>
-                </View>
-                <View style={s.navLinkChev}>
-                  <Feather name="chevron-right" size={rs(18)} color={C.teal4} />
-                </View>
-              </View>
-            </SpringPress>
           </View>
 
-          {/* ══════════════════════════════
-              TARAWEEH SECTION
-          ══════════════════════════════ */}
-          <View style={{ marginTop: rs(8) }}>
-            <Divider label="TARAWEEH" />
-
-            {/* Tasbeeh card */}
-            <View style={s.tasWrap}>
-              <LinearGradient
-                colors={[C.teal2, C.teal0]}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                style={s.tasCard}
-              >
-                {/* decorative rings */}
-                <View style={{ position: 'absolute', top: -rs(20), right: -rs(20), width: rs(80), height: rs(80), borderRadius: rs(40), borderWidth: 1, borderColor: 'rgba(212,148,42,0.18)' }} />
-                <LinearGradient
-                  colors={['transparent', C.goldMid + '70', 'transparent']}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                  style={{ position: 'absolute', top: 0, left: 0, right: 0, height: rs(2) }}
-                />
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: rs(12) }}>
-                  <StarOrn color={C.goldMid} size={rs(14)} />
-                  <Text style={s.tasTitleTxt}>Tasbeeh-e-Taraweeh</Text>
-                </View>
-                <Text style={s.tasArabic}>{TARAWEEH_TASBEEH}</Text>
-              </LinearGradient>
-            </View>
-
-            {/* Tracker */}
-            <View style={s.trackerWrap}>
-              <View style={s.trackerHeader}>
-                <Text style={s.trackerTitle}>Taraweeh Tracker</Text>
-                <View style={s.trackerBadge}>
-                  <Text style={s.trackerBadgeTxt}>{taraweeh} / 20</Text>
-                </View>
-              </View>
-              {/* Progress bar */}
-              <View style={s.progressBg}>
-                <LinearGradient
-                  colors={[C.goldMid, C.gold]}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                  style={[s.progressFill, { width: `${(taraweeh / 20) * 100}%` }]}
-                />
-              </View>
-              <View style={s.trackerRow}>
-                {TARAWEEH_STAGES.map((num) => {
-                  const done = taraweeh >= num;
-                  return (
-                    <SpringPress
-                      key={num}
-                      onPress={() => setTaraweeh(done && taraweeh === num ? num - 4 : num)}
-                      style={s.trkBtnWrap}
-                    >
-                      <View style={[s.trkBtn, done && s.trkBtnDone]}>
-                        {done ? (
-                          <LinearGradient colors={[C.goldMid, C.gold]} style={StyleSheet.absoluteFill} />
-                        ) : null}
-                        <MaterialCommunityIcons
-                          name={done ? 'check-circle' : 'weather-night'}
-                          size={rs(20)}
-                          color={done ? C.teal0 : C.teal5}
-                        />
-                        <Text style={[s.trkNum, done && s.trkNumDone]}>{num}</Text>
-                      </View>
-                    </SpringPress>
-                  );
-                })}
-              </View>
-            </View>
-          </View>
-
-          {/* ══════════════════════════════
-              HADITH OF THE DAY
-          ══════════════════════════════ */}
-          <View style={{ marginTop: rs(8) }}>
-            <Divider label="HADITH OF THE DAY" />
-            <View style={s.hadithCard}>
-              {/* Corner ornaments */}
-              {[[0, 0], [null, 0], [0, null], [null, null]].map(([top, left], i) => (
-                <View key={i} style={[
-                  s.corner,
-                  top !== null ? { top: 0 } : { bottom: 0 },
-                  left !== null ? { left: 0 } : { right: 0 },
-                  top !== null && left !== null ? { borderTopWidth: 2, borderLeftWidth: 2 }
-                  : top !== null ? { borderTopWidth: 2, borderRightWidth: 2 }
-                  : left !== null ? { borderBottomWidth: 2, borderLeftWidth: 2 }
-                  : { borderBottomWidth: 2, borderRightWidth: 2 },
-                ]} />
+          {/* ═══════════════ HADITH OF THE DAY ═══════════════ */}
+          <View style={{ marginTop: rs(8), marginBottom: rs(20) }}>
+            <GoldDivider label="HADITH OF THE DAY" />
+            <View style={s.hadithWrap}>
+              {[
+                { top: 0, left: 0, bT: 2, bL: 2 },
+                { top: 0, right: 0, bT: 2, bR: 2 },
+                { bottom: 0, left: 0, bB: 2, bL: 2 },
+                { bottom: 0, right: 0, bB: 2, bR: 2 },
+              ].map((pos, i) => (
+                <View key={i} style={[ s.corner, { top: pos.top, bottom: pos.bottom, left: pos.left, right: pos.right, borderTopWidth: (pos as any).bT, borderBottomWidth: (pos as any).bB, borderLeftWidth: (pos as any).bL, borderRightWidth: (pos as any).bR }]} />
               ))}
 
-              <View style={s.hadithTop}>
-                <MaterialCommunityIcons name="format-quote-open" size={rs(28)} color={C.teal1} style={{ opacity: 0.2 }} />
-              </View>
+              <MaterialCommunityIcons name="format-quote-open" size={rs(32)} color={C.teal1} style={{ opacity: 0.15, alignSelf: 'center', marginBottom: rs(4) }} />
 
-              <Text style={s.hadithTxt} numberOfLines={7}>
-                {dailyHadith ? `"${dailyHadith.text.trim()}"` : 'Loading…'}
-              </Text>
+              <Text style={s.hadithText} numberOfLines={4}>{hadith ? `"${hadith.text.trim()}"` : 'Loading…'}</Text>
 
-              {dailyHadith && (
-                <View style={s.hadithFooter}>
-                  <View style={s.hadithDivLine} />
-                  <Text style={s.hadithAuthor}>{dailyHadith.by}</Text>
-                  <Text style={s.hadithSrc}>{dailyHadith.volumeName} · {dailyHadith.bookName}</Text>
-                  <Text style={s.hadithRef}>{dailyHadith.info}</Text>
-                  <SpringPress onPress={() => router.push('../../screens/hadith' as any)} style={{ alignSelf: 'center', marginTop: rs(14) }}>
-                    <LinearGradient
-                      colors={[C.teal2, C.teal1]}
-                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                      style={s.readMoreBtn}
-                    >
-                      <Text style={s.readMoreTxt}>Read More</Text>
+              {hadith && (
+                <>
+                  <View style={s.hadithDivider} />
+                  <Text style={s.hadithAuthor}>{hadith.by}</Text>
+                  <Text style={s.hadithSource}>{hadith.volumeName} · {hadith.bookName}</Text>
+                  <Text style={s.hadithRef}>{hadith.info}</Text>
+
+                  <PressScale onPress={() => router.push('/screens/hadith' as any)} style={{ alignSelf: 'center', marginTop: rs(14) }}>
+                    <LinearGradient colors={[C.teal2, C.teal1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.readMoreBtn}>
+                      <Text style={s.readMoreTxt}>Read Full Hadith</Text>
                       <Feather name="arrow-right" size={rs(12)} color={C.white} />
                     </LinearGradient>
-                  </SpringPress>
-                </View>
+                  </PressScale>
+                </>
               )}
             </View>
           </View>
 
-          <View style={{ height: rs(50) }} />
+          <View style={{ height: rs(80) }} />
         </ScrollView>
       </Animated.View>
     </SafeAreaView>
   );
 }
 
-/* ═══════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════════
    STYLES
-═══════════════════════════════════════════ */
-const cardShadow = Platform.select({
-  ios:     { shadowColor: C.shadow, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.14, shadowRadius: 12 },
-  android: { elevation: 5 },
+════════════════════════════════════════════════════════════════════ */
+const softShadow = Platform.select({
+  ios: { shadowColor: C.shadow, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.12, shadowRadius: 10 },
+  android: { elevation: 4 },
 });
-const heavyShadow = Platform.select({
-  ios:     { shadowColor: C.shadow, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.50, shadowRadius: 18 },
-  android: { elevation: 12 },
+
+const heroShadow = Platform.select({
+  ios: { shadowColor: C.shadow, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.55, shadowRadius: 22 },
+  android: { elevation: 14 },
+});
+
+const ls = StyleSheet.create({
+  root: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: C.teal1 },
+  txt: { color: C.tealLt, fontSize: rs(13), marginTop: rs(14), letterSpacing: 0.4 },
 });
 
 const s = StyleSheet.create({
-  root:   { flex: 1, backgroundColor: C.bg },
-  scroll: { paddingBottom: rs(20) },
+  root: { flex: 1, backgroundColor: C.bg },
+  scroll: { paddingBottom: rs(10) },
 
-  /* ── Hero / Header ── */
-  heroWrap: {
-    overflow: 'hidden',
-    paddingHorizontal: PAD,
-    paddingBottom: rs(24),
-    marginBottom: rs(12),
-    ...Platform.select({
-      ios:     { shadowColor: C.shadow, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.55, shadowRadius: 24 },
-      android: { elevation: 14 },
-    }),
-  },
-  heroTop: {
-    flexDirection:  'row',
-    justifyContent: 'space-between',
-    alignItems:     'flex-start',
-    marginTop:      rs(14),
-    marginBottom:   rs(18),
-  },
-  appName: {
-    fontSize:   rs(28),
-    fontWeight: '800',
-    color:      C.white,
-    letterSpacing: -0.5,
-    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
-  },
-  locRow: { flexDirection: 'row', alignItems: 'center', marginTop: rs(4), gap: rs(4) },
-  locTxt: { color: C.tealLt, fontSize: rs(12), fontWeight: '500' },
-  heroRight: { alignItems: 'flex-end' },
-  hijriPill: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    gap:               rs(6),
-    backgroundColor:   'rgba(232,184,75,0.15)',
-    borderWidth:       1,
-    borderColor:       'rgba(232,184,75,0.30)',
-    borderRadius:      rs(20),
-    paddingHorizontal: rs(10),
-    paddingVertical:   rs(5),
-  },
-  hijriTxt: { color: C.goldLt, fontSize: rs(12), fontWeight: '700' },
+  hero: { overflow: 'hidden', paddingHorizontal: PAD, paddingBottom: rs(22), marginBottom: rs(0), ...heroShadow },
+  heroHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: rs(14), marginBottom: rs(20) },
+  heroHeaderLeft: { flex: 1, marginRight: rs(12) },
+  heroHeaderRight: { alignItems: 'flex-end' },
+  greetRow: { flexDirection: 'row', alignItems: 'center', marginBottom: rs(4) },
+  greetTxt: { color: C.tealLt, fontSize: clamp(rs(11), 10, 14), fontWeight: '600', letterSpacing: 1.2, textTransform: 'uppercase' },
+  appName: { color: C.white, fontSize: clamp(rs(26), 22, 34), fontWeight: '800', letterSpacing: -0.5, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' },
+  locRow: { flexDirection: 'row', alignItems: 'center', gap: rs(4), marginBottom: rs(8) },
+  locTxt: { color: C.tealLt, fontSize: clamp(rs(12), 10, 14), fontWeight: '500', maxWidth: rs(120) },
+  locAlert: { flexDirection: 'row', alignItems: 'center', gap: rs(4), backgroundColor: 'rgba(224,112,96,0.15)', borderWidth: 1, borderColor: 'rgba(224,112,96,0.30)', borderRadius: rs(12), paddingHorizontal: rs(8), paddingVertical: rs(4), marginBottom: rs(8) },
+  locAlertTxt: { color: C.coral, fontSize: rs(10), fontWeight: '700' },
+  hijriPill: { backgroundColor: C.goldGlass, borderWidth: 1, borderColor: C.goldBorder, borderRadius: rs(20), paddingHorizontal: rs(10), paddingVertical: rs(5) },
+  hijriTxt: { color: C.goldLt, fontSize: clamp(rs(8), 7, 11), fontWeight: '700', letterSpacing: 0.3 },
 
-  heroMid: { alignItems: 'center', marginBottom: rs(22) },
-  heroArabic: {
-    color:      C.white,
-    fontSize:   rs(22),
-    textAlign:  'center',
-    lineHeight: rs(38),
-    fontFamily: 'IndoPakQuran',
-    writingDirection: 'rtl',
-    marginBottom: rs(6),
-  },
-  heroTagline: {
-    color:         C.tealLt,
-    fontSize:      rs(12),
-    letterSpacing: 2,
-    fontWeight:    '500',
-    textTransform: 'uppercase',
-  },
+  verseWrap: { alignItems: 'center', marginBottom: rs(20) },
+  verseAr: { color: C.white, fontSize: clamp(rs(20), 17, 28), textAlign: 'center', lineHeight: clamp(rs(36), 30, 50), writingDirection: 'rtl', marginBottom: rs(8), fontFamily: Platform.OS === 'ios' ? 'GeezaPro' : 'serif' },
+  verseEn: { color: C.tealLt, fontSize: clamp(rs(12), 11, 15), textAlign: 'center', letterSpacing: 0.3, lineHeight: rs(18), fontStyle: 'italic' },
+  verseRef: { color: C.goldMid + 'AA', fontSize: clamp(rs(10), 9, 12), textAlign: 'center', marginTop: rs(4), letterSpacing: 0.8 },
 
-  /* Prayer time cards */
-  prayerRow: {
-    flexDirection: 'row',
-    gap:           rs(10),
-    marginBottom:  rs(18),
-  },
-  pCard: {
-    flex:            1,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius:    rs(16),
-    borderWidth:     1,
-    borderColor:     C.glassBrd,
-    padding:         rs(12),
-    alignItems:      'center',
-    gap:             rs(3),
-    overflow:        'hidden',
-  },
-  pCardFeatured: {
-    backgroundColor: 'rgba(232,184,75,0.10)',
-    borderColor:     'rgba(232,184,75,0.35)',
-    borderWidth:     1.5,
-  },
-  pCardLabel: {
-    color:         C.tealLt,
-    fontSize:      rs(9),
-    fontWeight:    '700',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-    textAlign:     'center',
-  },
-  pCardVal: {
-    color:      C.white,
-    fontSize:   rs(16),
-    fontWeight: '800',
-    letterSpacing: -0.3,
-  },
-  pCardSub: {
-    color:      C.tealLt,
-    fontSize:   rs(9),
-    fontWeight: '500',
-    textAlign:  'center',
-  },
-  pCardDot: {
-    position:     'absolute',
-    bottom:       0,
-    left:         '50%',
-    width:        rs(24),
-    height:       rs(2),
-    borderRadius: rs(1),
-    backgroundColor: C.goldMid,
-    marginLeft:   -rs(12),
-  },
+  nextPrayerCard: { flexDirection: 'row', alignItems: 'center', borderRadius: rs(20), borderWidth: 1.5, borderColor: C.goldBorder, overflow: 'hidden', padding: rs(18), marginBottom: rs(14) },
+  npc_border: { position: 'absolute', bottom: 0, left: '50%', width: rs(40), height: rs(3), borderRadius: rs(2), backgroundColor: C.goldMid, marginLeft: -rs(20) },
+  npc_left: { flex: 1 },
+  npc_label: { color: C.goldMid + 'BB', fontSize: clamp(rs(9), 8, 11), fontWeight: '800', letterSpacing: 1.6, marginBottom: rs(4) },
+  npc_name: { color: C.white, fontSize: clamp(rs(28), 24, 38), fontWeight: '800', letterSpacing: -0.5, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' },
+  npc_time: { color: C.goldLt, fontSize: clamp(rs(16), 14, 22), fontWeight: '700', marginTop: rs(2) },
+  npc_divider: { width: 1, height: rs(56), backgroundColor: C.goldBorder, marginHorizontal: rs(18) },
+  npc_right: { alignItems: 'center' },
+  npc_cdLabel: { color: C.tealLt, fontSize: clamp(rs(8), 7, 10), fontWeight: '700', letterSpacing: 1.2, marginBottom: rs(4) },
+  npc_cd: { color: C.white, fontSize: clamp(rs(22), 18, 30), fontWeight: '800', letterSpacing: -0.5 },
 
-  /* Hero quick-link */
-  heroLink: { overflow: 'hidden', borderRadius: rs(16) },
-  heroLinkInner: {
-    flexDirection:   'row',
-    alignItems:      'center',
-    backgroundColor: C.glassM,
-    borderRadius:    rs(16),
-    borderWidth:     1,
-    borderColor:     C.glassBrd,
-    padding:         rs(14),
-    gap:             rs(12),
-  },
-  heroLinkIconWrap: {
-    width:          rs(40),
-    height:         rs(40),
-    borderRadius:   rs(12),
-    backgroundColor: 'rgba(232,184,75,0.18)',
-    borderWidth:    1,
-    borderColor:    'rgba(232,184,75,0.35)',
-    alignItems:     'center',
-    justifyContent: 'center',
-  },
-  heroLinkTitle: { color: C.white,  fontSize: rs(14), fontWeight: '700' },
-  heroLinkSub:   { color: C.tealLt, fontSize: rs(11), marginTop: rs(1) },
-  heroLinkArrow: {
-    width:          rs(32),
-    height:         rs(32),
-    borderRadius:   rs(10),
-    backgroundColor: C.goldMid,
-    alignItems:     'center',
-    justifyContent: 'center',
-  },
+  ramadanRow: { flexDirection: 'row', gap: rs(10) },
+  ramCard: { flex: 1, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: C.glassBrd, borderRadius: rs(14), padding: rs(12), alignItems: 'center', gap: rs(3) },
+  ramLabel: { color: C.tealLt, fontSize: clamp(rs(9), 8, 11), fontWeight: '600', letterSpacing: 0.6, textTransform: 'uppercase' },
+  ramTime: { color: C.white, fontSize: clamp(rs(14), 12, 18), fontWeight: '800' },
+  ramCd: { color: C.goldMid + 'BB', fontSize: clamp(rs(10), 9, 12), fontWeight: '500' },
 
-  /* ── Section wrapper ── */
-  section: { marginTop: rs(8) },
+  prayerStrip: { backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.tealFaint, ...softShadow },
+  prayerStripInner: { paddingHorizontal: PAD, paddingVertical: rs(12), gap: rs(4) },
+  pCell: { width: rs(88), alignItems: 'center', paddingVertical: rs(10), paddingHorizontal: rs(8), borderRadius: rs(14), borderWidth: 1, borderColor: C.tealFaint, marginRight: rs(8), gap: rs(3), overflow: 'hidden', backgroundColor: C.surfaceAlt },
+  pCellActive: { borderColor: C.teal1, backgroundColor: C.teal1 },
+  pCellName: { fontSize: clamp(rs(10), 9, 13), fontWeight: '700', color: C.inkLight, letterSpacing: 0.4 },
+  pCellNameActive: { color: C.goldLt },
+  pCellTime: { fontSize: clamp(rs(12), 11, 15), fontWeight: '800', color: C.ink },
+  pCellTimeActive: { color: C.white },
+  pCellDot: { position: 'absolute', bottom: 0, width: rs(20), height: rs(2), borderRadius: rs(1), backgroundColor: C.goldMid },
 
-  /* ── Features grid ── */
-  featGrid: {
-    flexDirection:  'row',
-    flexWrap:       'wrap',
-    paddingHorizontal: PAD,
-    marginBottom:   rs(8),
-    gap:            rs(12),
-  },
-  featItemWrap: {
-    width: (W - PAD * 2 - rs(12) * 3) / 4,
-  },
-  featItem: { alignItems: 'center', gap: rs(8) },
-  featIconWrap: {
-    width:          rs(58),
-    height:         rs(58),
-    borderRadius:   rs(18),
-    backgroundColor: C.surface,
-    borderWidth:    1,
-    borderColor:    `${C.teal1}18`,
-    alignItems:     'center',
-    justifyContent: 'center',
-    overflow:       'hidden',
-    ...cardShadow,
-  },
-  featLabel: {
-    color:      C.ink,
-    fontSize:   rs(11),
-    fontWeight: '600',
-    textAlign:  'center',
-  },
+  section: { marginTop: rs(16) },
+  grid: { flexDirection: 'row', flexWrap: 'wrap' },
+  gridIconWrap: { width: rs(58), height: rs(58), borderRadius: rs(18), backgroundColor: C.surface, borderWidth: 1, borderColor: `${C.teal1}14`, alignItems: 'center', justifyContent: 'center', marginBottom: rs(6), overflow: 'hidden', ...softShadow },
+  gridLabel: { color: C.ink, fontSize: clamp(rs(11), 10, 13), fontWeight: '600', textAlign: 'center', letterSpacing: 0.1 },
 
-  /* ── Dua cards ── */
-  duaCardWrap: {
-    marginRight: rs(14),
-  },
-  duaCard: {
-    width:         rsp(0.68),
-    minHeight:     rs(175),
-    borderRadius:  rs(20),
-    padding:       rs(20),
-    overflow:      'hidden',
-    justifyContent: 'space-between',
-    ...heavyShadow,
-  },
-  duaBadge: {
-    flexDirection:   'row',
-    alignItems:      'center',
-    alignSelf:       'flex-start',
-    backgroundColor: 'rgba(232,184,75,0.18)',
-    borderWidth:     1,
-    borderColor:     'rgba(232,184,75,0.30)',
-    borderRadius:    rs(20),
-    paddingHorizontal: rs(10),
-    paddingVertical:   rs(4),
-    marginBottom:    rs(4),
-  },
-  duaBadgeTxt: { color: C.goldLt, fontSize: rs(9), fontWeight: '900', letterSpacing: 1.2 },
-  duaSub: { color: 'rgba(255,255,255,0.55)', fontSize: rs(11), marginBottom: rs(12) },
-  duaArabic: {
-    color:            C.white,
-    fontSize:         rs(22),
-    textAlign:        'center',
-    lineHeight:       rs(44),
-    fontFamily:       'IndoPakQuran',
-    writingDirection: 'rtl',
-  },
+  duaCardWrap: { marginRight: rs(12) },
+  duaCard: { width: clamp(rs(260), 220, 320), height: rs(220), borderRadius: rs(20), padding: rs(18), overflow: 'hidden', justifyContent: 'space-between', ...heroShadow },
+  duaPagRow: { position: 'absolute', top: rs(12), right: rs(14), flexDirection: 'row', gap: rs(4) },
+  duaPagDot: { width: rs(5), height: rs(5), borderRadius: rs(3), backgroundColor: 'rgba(255,255,255,0.30)' },
+  duaPagDotActive: { backgroundColor: C.goldMid, width: rs(14) },
+  duaHeader: { flexDirection: 'row', alignItems: 'center', gap: rs(7), marginBottom: rs(10) },
+  duaTitle: { color: C.goldLt, fontSize: clamp(font(12), 10, 15), fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase' },
+  duaArabic: { color: C.white, fontSize: clamp(rs(20), 17, 26), lineHeight: rs(28), textAlign: 'center', writingDirection: 'rtl', fontFamily: Platform.OS === 'ios' ? 'GeezaPro' : 'serif', marginBottom: rs(8) },
+  duaTrans: { color: 'rgba(255,255,255,0.65)', fontSize: clamp(rs(11), 10, 13), lineHeight: rs(17), textAlign: 'center', fontStyle: 'italic', marginBottom: rs(10) },
+  duaReadMore: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: rs(4) },
+  duaReadMoreTxt: { color: C.goldLt, fontSize: clamp(rs(10), 9, 12), fontWeight: '700', letterSpacing: 0.6 },
 
-  /* Nav links */
-  navLinkWrap: {
-    marginHorizontal: PAD,
-    marginTop:        rs(16),
-    marginBottom:     rs(8),
-    borderRadius:     rs(16),
-    overflow:         'hidden',
-    ...cardShadow,
-  },
-  navLink: {
-    flexDirection:   'row',
-    alignItems:      'center',
-    backgroundColor: C.surface,
-    borderRadius:    rs(16),
-    borderWidth:     1,
-    borderColor:     `${C.teal1}14`,
-    padding:         rs(14),
-    gap:             rs(12),
-  },
-  navLinkIcon: {
-    width:          rs(42),
-    height:         rs(42),
-    borderRadius:   rs(13),
-    backgroundColor: C.surfaceAlt,
-    borderWidth:    1,
-    borderColor:    `${C.teal1}18`,
-    alignItems:     'center',
-    justifyContent: 'center',
-  },
-  navLinkTitle: { color: C.ink,    fontSize: rs(14), fontWeight: '700' },
-  navLinkSub:   { color: C.inkLight, fontSize: rs(11), marginTop: rs(2) },
-  navLinkChev: {
-    width:          rs(32),
-    height:         rs(32),
-    borderRadius:   rs(10),
-    backgroundColor: `${C.teal1}10`,
-    borderWidth:    1,
-    borderColor:    `${C.teal1}18`,
-    alignItems:     'center',
-    justifyContent: 'center',
-  },
-
-  /* ── Taraweeh ── */
-  tasWrap: { marginHorizontal: PAD, marginBottom: rs(16) },
-  tasCard: {
-    borderRadius: rs(20),
-    padding:      rs(18),
-    overflow:     'hidden',
-    ...heavyShadow,
-  },
-  tasTitleTxt: {
-    color:         C.white,
-    fontSize:      rs(12),
-    fontWeight:    '700',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-    marginLeft:    rs(8),
-  },
-  tasArabic: {
-    color:            C.white,
-    fontSize:         rs(18),
-    textAlign:        'center',
-    lineHeight:       rs(38),
-    fontFamily:       'IndoPakQuran',
-    writingDirection: 'rtl',
-    opacity:          0.92,
-  },
-  trackerWrap: {
-    marginHorizontal: PAD,
-    backgroundColor:  C.surface,
-    borderRadius:     rs(20),
-    padding:          rs(18),
-    borderWidth:      1,
-    borderColor:      `${C.teal1}12`,
-    ...cardShadow,
-  },
-  trackerHeader: {
-    flexDirection:  'row',
-    justifyContent: 'space-between',
-    alignItems:     'center',
-    marginBottom:   rs(14),
-  },
-  trackerTitle: { fontSize: rs(14), fontWeight: '800', color: C.ink },
-  trackerBadge: {
-    backgroundColor:   `${C.goldMid}18`,
-    borderRadius:      rs(20),
-    borderWidth:       1,
-    borderColor:       `${C.goldMid}38`,
-    paddingHorizontal: rs(10),
-    paddingVertical:   rs(4),
-  },
-  trackerBadgeTxt: { color: C.gold, fontSize: rs(12), fontWeight: '800' },
-  progressBg: {
-    height:       rs(5),
-    borderRadius: rs(3),
-    backgroundColor: `${C.teal1}14`,
-    marginBottom:  rs(16),
-    overflow:      'hidden',
-  },
-  progressFill: { height: '100%', borderRadius: rs(3) },
-  trackerRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  trkBtnWrap: { width: (W - PAD * 2 - rs(36) - rs(48)) / 5 },
-  trkBtn: {
-    borderRadius:   rs(16),
-    paddingVertical: rs(12),
-    alignItems:     'center',
-    gap:            rs(5),
-    backgroundColor: C.surfaceAlt,
-    borderWidth:    1,
-    borderColor:    `${C.teal1}14`,
-    overflow:       'hidden',
-  },
-  trkBtnDone: { borderColor: C.goldMid + '50' },
-  trkNum:     { fontSize: rs(13), fontWeight: '700', color: C.teal5 },
-  trkNumDone: { color: C.teal0 },
-
-  /* ── Hadith card ── */
-  hadithCard: {
-    backgroundColor: C.surface,
-    marginHorizontal: PAD,
-    padding:         rs(22),
-    borderRadius:    rs(20),
-    borderWidth:     1,
-    borderColor:     `${C.teal1}12`,
-    position:        'relative',
-    ...cardShadow,
-  },
-  corner: {
-    position:    'absolute',
-    width:       rs(18),
-    height:      rs(18),
-    borderColor: C.goldMid,
-  },
-  hadithTop:   { alignItems: 'center', marginBottom: rs(4) },
-  hadithTxt:   {
-    fontSize:   rs(14),
-    color:      C.ink,
-    textAlign:  'center',
-    lineHeight: rs(24),
-    fontStyle:  'italic',
-    marginVertical: rs(10),
-  },
-  hadithFooter: { alignItems: 'center' },
-  hadithDivLine: {
-    width:            rs(40),
-    height:           rs(2),
-    borderRadius:     rs(1),
-    backgroundColor:  C.goldMid,
-    marginBottom:     rs(12),
-    opacity:          0.5,
-  },
-  hadithAuthor: { fontSize: rs(13), fontWeight: '800', color: C.teal1, marginBottom: rs(3) },
-  hadithSrc:    { fontSize: rs(11), color: C.inkLight, marginBottom: rs(2) },
-  hadithRef:    { fontSize: rs(10), color: C.teal5, fontWeight: '600' },
-  readMoreBtn: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    gap:               rs(6),
-    paddingHorizontal: rs(20),
-    paddingVertical:   rs(10),
-    borderRadius:      rs(22),
-  },
-  readMoreTxt: { color: C.white, fontSize: rs(12), fontWeight: '800', letterSpacing: 0.5 },
+  hadithWrap: { backgroundColor: C.surface, marginHorizontal: PAD, padding: rs(20), borderRadius: rs(20), borderWidth: 1, borderColor: `${C.teal1}12`, position: 'relative', ...softShadow },
+  corner: { position: 'absolute', width: rs(18), height: rs(18), borderColor: C.goldMid, borderWidth: 0 },
+  hadithText: { fontSize: clamp(rs(15), 13, 18), color: C.ink, textAlign: 'center', lineHeight: clamp(rs(24), 20, 30), fontStyle: 'italic', marginVertical: rs(10) },
+  hadithDivider: { width: rs(36), height: rs(2), borderRadius: rs(1), backgroundColor: C.goldMid, alignSelf: 'center', opacity: 0.6, marginBottom: rs(12) },
+  hadithAuthor: { fontSize: clamp(rs(13), 11, 16), fontWeight: '800', color: C.teal1, textAlign: 'center', marginBottom: rs(3) },
+  hadithSource: { fontSize: clamp(rs(11), 10, 13), color: C.inkLight, textAlign: 'center', marginBottom: rs(2) },
+  hadithRef: { fontSize: clamp(rs(10), 9, 12), color: C.teal5, fontWeight: '600', textAlign: 'center' },
+  readMoreBtn: { flexDirection: 'row', alignItems: 'center', gap: rs(6), paddingHorizontal: rs(22), paddingVertical: rs(11), borderRadius: rs(24) },
+  readMoreTxt: { color: C.white, fontSize: clamp(rs(12), 11, 14), fontWeight: '800', letterSpacing: 0.4 },
 });

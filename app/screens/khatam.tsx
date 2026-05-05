@@ -18,9 +18,11 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import { deleteKhatamPlanFromBackend, fetchKhatamPlanFromBackend, syncKhatamPlanWithBackend } from '../services/khatamService';
+
 // 1. IMPORT SAFE AREA CONTEXT
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-
+import { fetchAllSurahsFromBackend } from '../services/quranService';
 // --- RESPONSIVE UTILITIES ---
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const isSmallDevice = SCREEN_WIDTH < 375;
@@ -61,68 +63,123 @@ export default function SurahKhatamWrapper() {
 
 function SurahKhatamPlanner() {
   const router = useRouter();
-  // 2. GET INSETS
   const insets = useSafeAreaInsets();
   
   // --- States ---
   const [showAndroidPicker, setShowAndroidPicker] = useState(false);
   const [hasPlan, setHasPlan] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [targetDate, setTargetDate] = useState(new Date(2026, 3, 12));
+// 1. DYNAMIC DEFAULT DATE: Always 30 days from right now
+const getDefaultDate = () => {
+  const d = new Date();
+  d.setDate(d.getDate() + 30);
+  return d;
+};
+
+// 2. Updated target date state
+const [targetDate, setTargetDate] = useState(getDefaultDate());
   const [surahs, setSurahs] = useState<any[]>([]);
   const [completedSurahs, setCompletedSurahs] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [streak, setStreak] = useState(0);
   const [activeTab, setActiveTab] = useState<'today' | 'all'>('today');
 
-  // --- Persistence Logic ---
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const saved = await AsyncStorage.getItem("khatamData");
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          setCompletedSurahs(parsed.completed || []);
-          setTargetDate(new Date(parsed.date));
-          setHasPlan(parsed.hasPlan);
-          setStreak(parsed.streak || 0);
-        }
-      } catch (e) { console.error("Load error", e); }
-    };
-    loadData();
-    
-    fetch('https://api.alquran.cloud/v1/surah')
-      .then(res => res.json())
-      .then(json => {
-        setSurahs(json.data);
-        setLoading(false);
-      });
-  }, []);
+  // --- Persistence & Backend Fetch Logic ---
+  
+  // Inside your component's useEffect:
+ // --- Data Loading (Optimistic UI) ---
+ useEffect(() => {
+  const loadData = async () => {
+    // 1. Load Local Storage Instantly (Fast UX)
+    try {
+      const saved = await AsyncStorage.getItem("khatamData");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setCompletedSurahs(parsed.completed || []);
+        if (parsed.date) setTargetDate(new Date(parsed.date));
+        setHasPlan(parsed.hasPlan);
+        setStreak(parsed.streak || 0);
+      }
+    } catch (e) { console.error("Local load error", e); }
 
-  useEffect(() => {
-    if (!loading) {
-      AsyncStorage.setItem("khatamData", JSON.stringify({
-        completed: completedSurahs,
-        date: targetDate,
-        hasPlan,
-        streak
-      }));
+    // 2. Load Surah List from Backend
+    try {
+      const data = await fetchAllSurahsFromBackend();
+      setSurahs(data);
+    } catch (error) {
+      Alert.alert("Connection Error", "Could not load Quran data.");
     }
-  }, [completedSurahs, targetDate, hasPlan, streak, loading]);
 
+    // 3. Silent Sync with Server (Updates local if out of date)
+    try {
+      const serverData = await fetchKhatamPlanFromBackend();
+      if (serverData && serverData.hasPlan !== undefined) {
+        setCompletedSurahs(serverData.completedSurahs || []);
+        if (serverData.targetDate) setTargetDate(new Date(serverData.targetDate));
+        setHasPlan(serverData.hasPlan);
+        setStreak(serverData.streak || 0);
+        
+        // Cache the server truth
+        await AsyncStorage.setItem("khatamData", JSON.stringify({
+          completed: serverData.completedSurahs,
+          date: serverData.targetDate,
+          hasPlan: serverData.hasPlan,
+          streak: serverData.streak
+        }));
+      }
+    } catch (e) {
+      console.log("Could not reach server, using cached local Khatam data.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  loadData();
+}, []);
+// --- Auto-Save to Server ---
+useEffect(() => {
+  // 🚨 Only sync if the user actually has a plan
+  if (!loading && hasPlan) {
+    // 🚨 DATA INTEGRITY: Remove duplicates and limit to 114
+    const uniqueCompleted = [...new Set(completedSurahs)]
+      .filter(id => id >= 1 && id <= 114)
+      .slice(0, 114);
+
+    const planData = {
+      completedSurahs: uniqueCompleted,
+      targetDate: targetDate.toISOString(),
+      hasPlan,
+      streak
+    };
+
+    // Save locally instantly
+    AsyncStorage.setItem("khatamData", JSON.stringify({
+      completed: uniqueCompleted,
+      date: targetDate,
+      hasPlan,
+      streak
+    }));
+
+    // Sync to AWS in the background
+    syncKhatamPlanWithBackend(planData).catch(() => 
+      console.log("Background sync failed. Will retry later.")
+    );
+  }
+}, [completedSurahs, targetDate, hasPlan, streak, loading]);
   // --- Dynamic Math ---
-  const planData = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const diffTime = targetDate.getTime() - today.getTime();
-    const daysLeft = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-    
-    const surahsRemaining = 114 - completedSurahs.length;
-    const dynamicDailyGoal = Math.ceil(surahsRemaining / daysLeft);
-    const progressPercent = Math.round((completedSurahs.length / 114) * 100);
+// --- Dynamic Math ---
+const planData = useMemo(() => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diffTime = targetDate.getTime() - today.getTime();
+  const daysLeft = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24))); // Math.max prevents divide by zero
+  
+  const surahsRemaining = Math.max(0, 114 - completedSurahs.length);
+  const dynamicDailyGoal = Math.ceil(surahsRemaining / daysLeft);
+  const progressPercent = Math.round((completedSurahs.length / 114) * 100);
 
-    return { daysLeft, surahsRemaining, dynamicDailyGoal, progressPercent };
-  }, [targetDate, completedSurahs]);
+  return { daysLeft, surahsRemaining, dynamicDailyGoal, progressPercent };
+}, [targetDate, completedSurahs]);
 
   const todaysTargetList = useMemo(() => {
     const doneSet = new Set(completedSurahs);
@@ -140,13 +197,21 @@ function SurahKhatamPlanner() {
           text: "Delete", 
           style: "destructive", 
           onPress: async () => {
+            // 1. Optimistic UI update
             await AsyncStorage.removeItem("khatamData");
             setHasPlan(false);
             setCompletedSurahs([]);
             setStreak(0);
-            setTargetDate(new Date(2026, 3, 12));
+            setTargetDate(getDefaultDate()); // 🚨 Reset to dynamic 30 days
             setActiveTab('today');
-          } 
+
+            // 2. Wipe from server
+            try {
+              await deleteKhatamPlanFromBackend();
+            } catch (e) {
+              console.log("Failed to delete from server, but deleted locally.");
+            }
+          }
         }
       ]
     );
@@ -176,10 +241,8 @@ function SurahKhatamPlanner() {
 
   return (
     <LinearGradient colors={['#0A4A4A', '#064343', '#032626']} style={styles.container}>
-      {/* 3. TRANSLUCENT STATUS BAR */}
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* 4. DYNAMIC HEADER PADDING */}
       <View style={[styles.headerRow, { marginTop: insets.top + spacing.sm }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
           <Ionicons name="chevron-back" size={24} color="#f5f5dc" />
@@ -304,7 +367,6 @@ function SurahKhatamPlanner() {
             </View>
           </View>
 
-          {/* 5. BOTTOM SAFE AREA PADDING */}
           <ScrollView 
             style={styles.scrollArea}
             showsVerticalScrollIndicator={false}
